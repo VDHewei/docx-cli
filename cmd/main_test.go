@@ -2,147 +2,221 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/VDHewei/docx-cli/pkg/docxlib"
 	"github.com/gomutex/godocx"
 )
 
-func TestPerformReplacements(t *testing.T) {
-	// 创建测试文档
+func TestParseReplacement(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantOld  string
+		wantNew  string
+		wantNil  bool
+	}{
+		{"foo=bar", "foo", "bar", false},
+		{"foo=bar=baz", "foo", "bar=baz", false},
+		{"foobar", "", "", true},
+	}
+
+	for _, tt := range tests {
+		got := parseReplacement(tt.input)
+		if tt.wantNil {
+			if got != nil {
+				t.Errorf("parseReplacement(%q) expected nil", tt.input)
+			}
+			continue
+		}
+		if got == nil {
+			t.Errorf("parseReplacement(%q) unexpected nil", tt.input)
+			continue
+		}
+		if got.Old != tt.wantOld || got.New != tt.wantNew {
+			t.Errorf("parseReplacement(%q) = {%q, %q}, want {%q, %q}",
+				tt.input, got.Old, got.New, tt.wantOld, tt.wantNew)
+		}
+	}
+}
+
+func TestDocxlibIntegration_BodyAndTable(t *testing.T) {
 	doc, err := godocx.NewDocument()
 	if err != nil {
 		t.Fatalf("创建文档失败: %v", err)
 	}
 
 	doc.AddParagraph("Hello World")
-	doc.AddParagraph("Test Document")
-	doc.AddParagraph("Hello Everyone")
 
-	// 直接在内存中操作（不保存到文件）
-	replacements := []Replacement{
-		{Old: "Hello", New: "Goodbye"},
-	}
-	stats := performReplacements(doc, replacements, false, false, false)
+	table := doc.AddTable()
+	row := table.AddRow()
+	cell := row.AddCell()
+	cell.AddParagraph("Table Cell Old")
 
-	// 验证结果
-	if stats.totalReplacements != 2 {
-		t.Errorf("期望替换 2 次，实际 %d 次", stats.totalReplacements)
-	}
+	rules := []docxlib.ReplacementRule{{Old: "Hello", New: "Hi"}, {Old: "Old", New: "New"}}
+	result := docxlib.ReplaceAll(doc, rules, docxlib.ReplaceOptions{Workers: 2})
 
-	if stats.paragraphsProcessed != 2 {
-		t.Errorf("期望处理 2 个段落，实际 %d 个", stats.paragraphsProcessed)
+	if result.TotalReplacements != 2 {
+		t.Errorf("期望替换 2 次，实际 %d", result.TotalReplacements)
 	}
 
-	// 验证文本内容
-	paragraphs := doc.Document.Body.Children
-	if len(paragraphs) != 3 {
-		t.Errorf("期望 3 个段落，实际 %d 个", len(paragraphs))
+	texts := docxlib.ExtractAllText(doc)
+	foundBody := false
+	foundTable := false
+	for _, dt := range texts {
+		if dt.Text == "Hi World" {
+			foundBody = true
+		}
+		if dt.Text == "Table Cell New" {
+			foundTable = true
+		}
 	}
-
-	// 检查第一个段落
-	text1 := getParagraphText(paragraphs[0].Para)
-	if text1 != "Goodbye World" {
-		t.Errorf("段落1期望 'Goodbye World'，实际 '%s'", text1)
+	if !foundBody {
+		t.Error("正文中未找到 'Hi World'")
 	}
-
-	// 检查第三个段落
-	text3 := getParagraphText(paragraphs[2].Para)
-	if text3 != "Goodbye Everyone" {
-		t.Errorf("段落3期望 'Goodbye Everyone'，实际 '%s'", text3)
+	if !foundTable {
+		t.Error("表格中未找到 'Table Cell New'")
 	}
-
-	t.Log("替换功能测试通过")
 }
 
-func TestPerformReplacementsMultiple(t *testing.T) {
-	// 创建文档
+func TestDocxlibIntegration_SaveAndReopen(t *testing.T) {
 	doc, err := godocx.NewDocument()
 	if err != nil {
 		t.Fatalf("创建文档失败: %v", err)
 	}
+	doc.AddParagraph("Persistent Text")
 
-	doc.AddParagraph("Hello World")
-	doc.AddParagraph("ABC Corporation")
-
-	// 多个替换规则
-	replacements := []Replacement{
-		{Old: "Hello", New: "Goodbye"},
-		{Old: "ABC Corporation", New: "XYZ Company"},
-	}
-	stats := performReplacements(doc, replacements, false, false, false)
-
-	// 验证
-	if stats.totalReplacements != 2 {
-		t.Errorf("期望 2 次替换，实际 %d 次", stats.totalReplacements)
-	}
-
-	paragraphs := doc.Document.Body.Children
-	text0 := getParagraphText(paragraphs[0].Para)
-	text1 := getParagraphText(paragraphs[1].Para)
-
-	if text0 != "Goodbye World" {
-		t.Errorf("段落0期望 'Goodbye World'，实际 '%s'", text0)
-	}
-	if text1 != "XYZ Company" {
-		t.Errorf("段落1期望 'XYZ Company'，实际 '%s'", text1)
-	}
-
-	t.Log("多规则替换测试通过")
-}
-
-func TestSaveDocument(t *testing.T) {
-	// 创建文档
-	doc, err := godocx.NewDocument()
-	if err != nil {
-		t.Fatalf("创建文档失败: %v", err)
-	}
-
-	doc.AddParagraph("Test Content")
-
-	// 使用临时目录
 	tmpDir := os.TempDir()
-	tmpFile := tmpDir + "/docx_test_output.docx"
-	
-	if err := doc.SaveTo(tmpFile); err != nil {
-		t.Fatalf("保存文档失败: %v", err)
-	}
+	tmpFile := filepath.Join(tmpDir, "docx_cli_test.docx")
 	defer os.Remove(tmpFile)
 
-	// 重新打开验证
-	rootDoc, err := godocx.OpenDocument(tmpFile)
+	if err := doc.SaveTo(tmpFile); err != nil {
+		t.Fatalf("保存失败: %v", err)
+	}
+
+	reopened, err := godocx.OpenDocument(tmpFile)
 	if err != nil {
-		t.Fatalf("打开文档失败: %v", err)
+		t.Fatalf("重新打开失败: %v", err)
 	}
 
-	if rootDoc.Document == nil || rootDoc.Document.Body == nil {
-		t.Error("文档结构无效")
+	texts := docxlib.ExtractAllText(reopened)
+	if len(texts) == 0 || !strings.Contains(texts[0].Text, "Persistent") {
+		t.Errorf("重新打开后文本不匹配: %+v", texts)
 	}
-
-	if len(rootDoc.Document.Body.Children) != 1 {
-		t.Errorf("期望 1 个段落，实际 %d 个", len(rootDoc.Document.Body.Children))
-	}
-
-	t.Log("保存功能测试通过")
 }
 
-func TestGetParagraphText(t *testing.T) {
-	// 创建文档
-	doc, err := godocx.NewDocument()
+func TestIntegration_TemplateRISC_Extract(t *testing.T) {
+	templatePath := filepath.Join("..", "tests", "template_RISC.docx")
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		t.Skip("未找到 template_RISC.docx")
+	}
+
+	doc, err := godocx.OpenDocument(templatePath)
 	if err != nil {
-		t.Fatalf("创建文档失败: %v", err)
+		t.Fatalf("打开模板失败: %v", err)
 	}
 
-	doc.AddParagraph("Test Paragraph Content")
-
-	// 获取段落文本
-	if len(doc.Document.Body.Children) == 0 {
-		t.Fatal("没有段落")
+	texts := docxlib.ExtractAllText(doc)
+	if len(texts) == 0 {
+		t.Fatal("从模板中未提取到任何文本")
 	}
 
-	text := getParagraphText(doc.Document.Body.Children[0].Para)
-	if text != "Test Paragraph Content" {
-		t.Errorf("期望 'Test Paragraph Content'，实际 '%s'", text)
+	t.Logf("从 template_RISC.docx 提取到 %d 段文本", len(texts))
+}
+
+func TestIntegration_TemplateRISC_Replace(t *testing.T) {
+	templatePath := filepath.Join("..", "tests", "template_RISC.docx")
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		t.Skip("未找到 template_RISC.docx")
 	}
 
-	t.Log("获取段落文本测试通过")
+	doc, err := godocx.OpenDocument(templatePath)
+	if err != nil {
+		t.Fatalf("打开模板失败: %v", err)
+	}
+
+	textsBefore := docxlib.ExtractAllText(doc)
+	if len(textsBefore) == 0 {
+		t.Skip("模板中没有可提取文本")
+	}
+
+	oldText := textsBefore[0].Text
+	if oldText == "" {
+		t.Skip("第一段文本为空")
+	}
+	newText := oldText + "_TEST_REPLACED"
+
+	rules := []docxlib.ReplacementRule{{Old: oldText, New: newText}}
+	result := docxlib.ReplaceAll(doc, rules, docxlib.ReplaceOptions{Workers: 4})
+	if result.TotalReplacements == 0 {
+		t.Errorf("期望至少发生 1 次替换，实际 %d", result.TotalReplacements)
+	}
+
+	textsAfter := docxlib.ExtractAllText(doc)
+	found := false
+	for _, dt := range textsAfter {
+		if dt.Text == newText {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("替换后未找到 '%s'", newText)
+	}
+}
+
+func TestReplacedDocOpens(t *testing.T) {
+	templatePath := filepath.Join("..", "tests", "template_RISC.docx")
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		t.Skip("未找到 template_RISC.docx")
+	}
+
+	// 1. 打开原文档
+	doc, err := godocx.OpenDocument(templatePath)
+	if err != nil {
+		t.Fatalf("打开原文档失败: %v", err)
+	}
+
+	// 2. 执行替换
+	rules := []docxlib.ReplacementRule{{Old: "Contract", New: "Agreement"}}
+	result := docxlib.ReplaceAll(doc, rules, docxlib.ReplaceOptions{Workers: 4})
+	if result.TotalReplacements == 0 {
+		t.Log("警告: 未发生任何替换，但继续验证文档可打开")
+	}
+
+	// 3. 保存到临时文件
+	tmpDir := os.TempDir()
+	replacedPath := filepath.Join(tmpDir, "template_RISC_replaced_test.docx")
+	defer os.Remove(replacedPath)
+
+	if err := doc.SaveTo(replacedPath); err != nil {
+		t.Fatalf("保存替换后的文档失败: %v", err)
+	}
+
+	// 4. 重新打开验证
+	reopened, err := godocx.OpenDocument(replacedPath)
+	if err != nil {
+		t.Fatalf("重新打开替换后的文档失败: %v", err)
+	}
+
+	// 5. 验证内容
+	texts := docxlib.ExtractAllText(reopened)
+	if len(texts) == 0 {
+		t.Fatal("替换后的文档重新打开后无法提取到文本")
+	}
+
+	// 检查替换是否生效
+	found := false
+	for _, dt := range texts {
+		if strings.Contains(dt.Text, "Agreement") {
+			found = true
+			break
+		}
+	}
+	if !found && result.TotalReplacements > 0 {
+		t.Errorf("替换后重新打开文档，未找到 'Agreement'")
+	}
+
+	t.Logf("替换后文档验证通过: 提取到 %d 段文本", len(texts))
 }
