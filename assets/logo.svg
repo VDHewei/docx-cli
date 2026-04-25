@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#2563EB" />
+  
+  <!-- Document icon -->
+  <rect x="55" y="40" width="90" height="120" rx="6" fill="#FFFFFF" />
+  <rect x="70" y="65" width="60" height="6" rx="3" fill="#CBD5E1" />
+  <rect x="70" y="82" width="60" height="6" rx="3" fill="#CBD5E1" />
+  <rect x="70" y="99" width="40" height="6" rx="3" fill="#CBD5E1" />
+  <rect x="70" y="120" width="25" height="25" rx="4" fill="#2563EB" opacity="0.15" />
+  
+  <!-- Corner fold -->
+  <path d="M145 40 L145 70 L175 70 Z" fill="#E2E8F0" />
+  
+  <!-- Small gear/cog decoration -->
+  <circle cx="145" cy="145" r="22" fill="#1D4ED8" />
+  <circle cx="145" cy="145" r="10" fill="#FFFFFF" />
+  <rect x="139" y="118" width="12" height="10" rx="2" fill="#1D4ED8" />
+  <rect x="139" y="162" width="12" height="10" rx="2" fill="#1D4ED8" />
+  <rect x="118" y="139" width="10" height="12" rx="2" fill="#1D4ED8" />
+  <rect x="162" y="139" width="10" height="12" rx="2" fill="#1D4ED8" />
+</svg>

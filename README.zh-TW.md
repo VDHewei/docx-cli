@@ -1,0 +1,124 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="docx-cli logo" width="120" height="120">
+</p>
+
+<h1 align="center">docx-cli</h1>
+
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> |
+  <a href="README.zh-TW.md">繁體中文</a> |
+  <a href="README.en.md">English</a>
+</p>
+
+---
+
+`docx-cli` 是一個基於 Go 的命令列工具，用於對 DOCX 文件進行查找替換、文字提取以及轉換為 TypeScript 程式碼。
+
+### 功能特性
+
+- **全文查找替換**：支援正文段落、表格儲存格、頁首、頁尾中的文字替換
+- **並發處理**：支援多 Worker 並發替換，提升處理速度
+- **文字提取**：提取 DOCX 中所有文字內容並顯示位置資訊
+- **樣式保留**：替換時保留原始文字樣式（字體、粗體、斜體、顏色、大小等）
+- **TypeScript 轉換**：將 DOCX 文件轉換為 `docx.js` 可用的 TypeScript 原始碼
+- **圖片支援**：提取內嵌圖片並以 Base64 形式嵌入生成的 TypeScript
+
+### 安裝
+
+```bash
+go install github.com/VDHewei/docx-cli/cmd@latest
+```
+
+或從源碼建置：
+
+```bash
+git clone https://github.com/VDHewei/docx-cli.git
+cd docx-cli
+go build -o docx-find-replace.exe ./cmd
+```
+
+### 用法
+
+#### 查找替換
+
+```bash
+# 基本替換
+docx-find-replace -i input.docx -r "Company A=Company B"
+
+# 多條替換規則
+docx-find-replace -i input.docx -r "Hello=Hi" -r "World=Earth"
+
+# 使用 JSON 規則文件
+docx-find-replace -i input.docx -f replacements.json
+
+# 跳過頁首頁尾
+docx-find-replace -i input.docx -r "old=new" --no-headers --no-footers
+
+# 指定並發 Worker 數
+docx-find-replace -i input.docx -r "old=new" --workers 8
+```
+
+#### 提取文字
+
+```bash
+docx-find-replace -i input.docx --extract
+```
+
+#### 轉換為 TypeScript
+
+```bash
+# 預設輸出 docx_template.ts
+docx-find-replace -i input.docx --to-ts
+
+# 指定輸出文件名稱
+docx-find-replace -i input.docx --to-ts -o my_template.ts
+```
+
+生成的 TypeScript 文件依賴 [docx](https://www.npmjs.com/package/docx) npm 套件：
+
+```bash
+npm install docx
+# 或
+bun add docx
+```
+
+### 專案結構
+
+```
+docx-cli/
+├── cmd/              # CLI 入口
+│   ├── main.go
+│   └── main_test.go
+├── pkg/docxlib/      # 核心庫
+│   ├── types.go      # 公共類型
+│   ├── extract.go    # 文字提取
+│   ├── replace.go    # 替換邏輯
+│   ├── to_ts.go      # TypeScript 轉換
+│   └── unsafe.go     # unsafe 反射輔助
+├── assets/           # 靜態資源
+│   └── logo.svg
+├── tests/            # 測試文件
+│   └── template_RISC.docx
+├── go.mod
+├── README.zh-CN.md
+├── README.zh-TW.md
+├── README.en.md
+└── LICENSE
+```
+
+### 測試
+
+```bash
+go test ./...
+```
+
+### 致謝
+
+本專案使用了以下開源專案：
+
+- [gomutex/godocx](https://github.com/gomutex/godocx) — Go DOCX 解析庫，[MIT License](https://opensource.org/licenses/MIT)
+- [docx](https://github.com/dolanmiu/docx) (docx.js) — TypeScript DOCX 生成庫，[MIT License](https://opensource.org/licenses/MIT)
+
+### 開源協議
+
+本專案採用 [Apache License 2.0](LICENSE)。
