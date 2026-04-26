@@ -54,6 +54,33 @@ func ToTypeScript(rootDoc *docx.RootDoc, imagesDir string) string {
 		b.WriteString("      },\n")
 	}
 
+	// Page margins from section properties
+	if rootDoc.Document.Body != nil && rootDoc.Document.Body.SectPr != nil && rootDoc.Document.Body.SectPr.PageMargin != nil {
+		pm := rootDoc.Document.Body.SectPr.PageMargin
+		var marginParts []string
+		if pm.Top != nil {
+			marginParts = append(marginParts, fmt.Sprintf("top: %d", *pm.Top))
+		}
+		if pm.Bottom != nil {
+			marginParts = append(marginParts, fmt.Sprintf("bottom: %d", *pm.Bottom))
+		}
+		if pm.Left != nil {
+			marginParts = append(marginParts, fmt.Sprintf("left: %d", *pm.Left))
+		}
+		if pm.Right != nil {
+			marginParts = append(marginParts, fmt.Sprintf("right: %d", *pm.Right))
+		}
+		if pm.Header != nil {
+			marginParts = append(marginParts, fmt.Sprintf("header: %d", *pm.Header))
+		}
+		if pm.Footer != nil {
+			marginParts = append(marginParts, fmt.Sprintf("footer: %d", *pm.Footer))
+		}
+		if len(marginParts) > 0 {
+			b.WriteString(fmt.Sprintf("      properties: { page: { margin: { %s } } },\n", strings.Join(marginParts, ", ")))
+		}
+	}
+
 	b.WriteString("      children: [\n")
 	for _, child := range sectionChildren {
 		b.WriteString(indent(child, 8) + ",\n")
@@ -88,6 +115,8 @@ import {
   convertMillimetersToTwip,
   ShadingType,
   VerticalAlign,
+  HeightRule,
+  LineRuleType,
 } from "docx";
 
 `
@@ -155,6 +184,19 @@ func extractHeaderFooterTS(rootDoc *docx.RootDoc, isHeader bool) map[string]stri
 	return result
 }
 
+// isOnOffTrue returns true if the OnOff element is present and enabled.
+// In OOXML, <w:b/> without val means true.
+func isOnOffTrue(o *ctypes.OnOff) bool {
+	if o == nil {
+		return false
+	}
+	if o.Val == nil {
+		return true // element present with no val means on
+	}
+	v := string(*o.Val)
+	return v == "true" || v == "1" || v == "on"
+}
+
 func paragraphToTS(para *ctypes.Paragraph, rootDoc *docx.RootDoc) string {
 	if para == nil {
 		return `new Paragraph("")`
@@ -163,7 +205,7 @@ func paragraphToTS(para *ctypes.Paragraph, rootDoc *docx.RootDoc) string {
 	var props []string
 	ppr := para.Property
 
-	if ppr != nil && ppr.PageBreakBefore != nil && ppr.PageBreakBefore.Val != nil && *ppr.PageBreakBefore.Val == "true" {
+	if ppr != nil && isOnOffTrue(ppr.PageBreakBefore) {
 		props = append(props, "pageBreakBefore: true")
 	}
 	if ppr != nil && ppr.Justification != nil && ppr.Justification.Val != "" {
@@ -238,22 +280,22 @@ func runToTS(run *ctypes.Run, rootDoc *docx.RootDoc) string {
 	}
 	if run.Property != nil {
 		rp := run.Property
-		if rp.Bold != nil && rp.Bold.Val != nil && *rp.Bold.Val == "true" {
+		if isOnOffTrue(rp.Bold) {
 			props = append(props, "bold: true")
 		}
-		if rp.Italic != nil && rp.Italic.Val != nil && *rp.Italic.Val == "true" {
+		if isOnOffTrue(rp.Italic) {
 			props = append(props, "italics: true")
 		}
-		if rp.Strike != nil && rp.Strike.Val != nil && *rp.Strike.Val == "true" {
+		if isOnOffTrue(rp.Strike) {
 			props = append(props, "strike: true")
 		}
-		if rp.DoubleStrike != nil && rp.DoubleStrike.Val != nil && *rp.DoubleStrike.Val == "true" {
+		if isOnOffTrue(rp.DoubleStrike) {
 			props = append(props, "doubleStrike: true")
 		}
-		if rp.Caps != nil && rp.Caps.Val != nil && *rp.Caps.Val == "true" {
+		if isOnOffTrue(rp.Caps) {
 			props = append(props, "allCaps: true")
 		}
-		if rp.SmallCaps != nil && rp.SmallCaps.Val != nil && *rp.SmallCaps.Val == "true" {
+		if isOnOffTrue(rp.SmallCaps) {
 			props = append(props, "smallCaps: true")
 		}
 		if rp.Color != nil && rp.Color.Val != "" {
@@ -302,7 +344,34 @@ func drawingToImageTS(drawing *dml.Drawing, rootDoc *docx.RootDoc) string {
 	if b64 == "" {
 		return ""
 	}
-	return fmt.Sprintf("new ImageRun({ data: Buffer.from(%s, \"base64\"), transformation: { width: 200, height: 200 } })", quote(b64))
+	// Extract actual dimensions from first inline/anchor extent
+	var widthPx, heightPx int
+	for _, inline := range drawing.Inline {
+		w := inline.Extent.Width
+		h := inline.Extent.Height
+		if w > 0 && h > 0 {
+			widthPx = int(w / 9525)
+			heightPx = int(h / 9525)
+			break
+		}
+	}
+	if widthPx == 0 && heightPx == 0 {
+		for _, anchor := range drawing.Anchor {
+			w := anchor.Extent.Width
+			h := anchor.Extent.Height
+			if w > 0 && h > 0 {
+				widthPx = int(w / 9525)
+				heightPx = int(h / 9525)
+				break
+			}
+		}
+	}
+	if widthPx == 0 || heightPx == 0 {
+		widthPx = 200
+		heightPx = 200
+	}
+
+	return fmt.Sprintf("new ImageRun({ data: Buffer.from(%s, \"base64\"), transformation: { width: %d, height: %d } })", quote(b64), widthPx, heightPx)
 }
 
 func tableToTS(tbl *ctypes.Table, rootDoc *docx.RootDoc) string {
@@ -322,6 +391,18 @@ func tableToTS(tbl *ctypes.Table, rootDoc *docx.RootDoc) string {
 
 	var parts []string
 	parts = append(parts, fmt.Sprintf("rows: [\n%s\n      ]", indent(strings.Join(rows, ",\n"), 8)))
+
+	if len(tbl.Grid.Col) > 0 {
+		var widths []string
+		for _, col := range tbl.Grid.Col {
+			if col.Width != nil {
+				widths = append(widths, fmt.Sprintf("%d", *col.Width))
+			}
+		}
+		if len(widths) > 0 {
+			parts = append(parts, fmt.Sprintf("columnWidths: [%s]", strings.Join(widths, ", ")))
+		}
+	}
 
 	if tbl.TableProp.Width != nil && tbl.TableProp.Width.Width != nil && tbl.TableProp.Width.WidthType != nil {
 		tw := *tbl.TableProp.Width.Width
@@ -360,7 +441,25 @@ func tableRowToTS(row *ctypes.Row, rootDoc *docx.RootDoc) string {
 	if len(cells) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("new TableRow({\n%s\n      })", indent(fmt.Sprintf("children: [\n%s\n      ]", indent(strings.Join(cells, ",\n"), 8)), 4))
+	var parts []string
+	parts = append(parts, fmt.Sprintf("children: [\n%s\n      ]", indent(strings.Join(cells, ",\n"), 8)))
+
+	// Row height
+	if row.Property != nil && row.Property.Height != nil && row.Property.Height.Val != nil {
+		h := *row.Property.Height.Val
+		rule := "AUTO"
+		if row.Property.Height.HRule != nil {
+			switch string(*row.Property.Height.HRule) {
+			case "exact":
+				rule = "EXACT"
+			case "atLeast":
+				rule = "AT_LEAST"
+			}
+		}
+		parts = append(parts, fmt.Sprintf("height: { value: %d, rule: HeightRule.%s }", h, rule))
+	}
+
+	return fmt.Sprintf("new TableRow({\n%s\n      })", indent(strings.Join(parts, ",\n"), 4))
 }
 
 func tableCellToTS(cell *ctypes.Cell, rootDoc *docx.RootDoc) string {
@@ -568,6 +667,21 @@ func spacingToTS(sp *ctypes.Spacing) string {
 	if sp.Line != nil {
 		parts = append(parts, fmt.Sprintf("line: %d", *sp.Line))
 	}
+	if sp.LineRule != nil {
+		lr := string(*sp.LineRule)
+		var rule string
+		switch lr {
+		case "auto":
+			rule = "LineRuleType.AUTO"
+		case "exact":
+			rule = "LineRuleType.EXACT"
+		case "atLeast":
+			rule = "LineRuleType.AT_LEAST"
+		default:
+			rule = fmt.Sprintf("%q", lr)
+		}
+		parts = append(parts, fmt.Sprintf("lineRule: %s", rule))
+	}
 	if len(parts) == 0 {
 		return ""
 	}
@@ -587,6 +701,38 @@ func indentToTS(ind *ctypes.Indent) string {
 	}
 	if ind.Hanging != nil {
 		parts = append(parts, fmt.Sprintf("hanging: %d", *ind.Hanging))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("{ %s }", strings.Join(parts, ", "))
+}
+
+func pageMarginToTS(m *ctypes.PageMargin) string {
+	if m == nil {
+		return ""
+	}
+	var parts []string
+	if m.Top != nil {
+		parts = append(parts, fmt.Sprintf("top: %d", *m.Top))
+	}
+	if m.Right != nil {
+		parts = append(parts, fmt.Sprintf("right: %d", *m.Right))
+	}
+	if m.Bottom != nil {
+		parts = append(parts, fmt.Sprintf("bottom: %d", *m.Bottom))
+	}
+	if m.Left != nil {
+		parts = append(parts, fmt.Sprintf("left: %d", *m.Left))
+	}
+	if m.Header != nil {
+		parts = append(parts, fmt.Sprintf("header: %d", *m.Header))
+	}
+	if m.Footer != nil {
+		parts = append(parts, fmt.Sprintf("footer: %d", *m.Footer))
+	}
+	if m.Gutter != nil {
+		parts = append(parts, fmt.Sprintf("gutter: %d", *m.Gutter))
 	}
 	if len(parts) == 0 {
 		return ""
