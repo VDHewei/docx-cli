@@ -194,7 +194,7 @@ func parseFlags() *Config {
 	noFooters := flagSet.Bool("no-footers", false, "跳过页脚部分")
 	verbose := flagSet.Bool("v", false, "显示详细处理信息")
 	version := flagSet.Bool("V", false, "显示版本号")
-	versionLong := flagSet.Bool("--version", false, "显示版本号")
+	versionLong := flagSet.Bool("version", false, "显示版本号")
 	verboseLong := flagSet.Bool("verbose", false, "显示详细处理信息")
 	extract := flagSet.Bool("extract", false, "仅提取文档中的所有文本")
 	toTS := flagSet.Bool("to-ts", false, "将 DOCX 转换为 TypeScript 源码")
