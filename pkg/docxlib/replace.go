@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gomutex/godocx/docx"
+	"github.com/gomutex/godocx/packager"
 	"github.com/gomutex/godocx/wml/ctypes"
 )
 
@@ -18,10 +19,10 @@ type ReplaceOptions struct {
 
 // replaceUnit represents a single unit of work for the worker pool.
 type replaceUnit struct {
-	kind     string           // "body", "table", "header", "footer"
-	para     *ctypes.Paragraph
-	path     string           // FileMap key for XML-based units
-	rootDoc  *docx.RootDoc
+	kind    string // "body", "table", "header", "footer"
+	para    *ctypes.Paragraph
+	path    string // FileMap key for XML-based units
+	rootDoc *docx.RootDoc
 }
 
 // ReplaceAll performs concurrent find-and-replace across the document.
@@ -141,6 +142,18 @@ func ReplaceAll(rootDoc *docx.RootDoc, rules []ReplacementRule, opts ReplaceOpti
 	wg.Wait()
 
 	return result
+}
+
+// ReplaceAllByBytes performs concurrent find-and-replace across the document.
+// It supports both region-level concurrency (different paragraphs/cells/XML files
+// are processed in parallel) and rule-level application (all rules are applied
+// sequentially within each unit to avoid conflicts).
+func ReplaceAllByBytes(data []byte, rules []ReplacementRule, opts ReplaceOptions) (*docx.RootDoc, ReplaceResult, error) {
+	rootDoc, err := packager.Unpack(&data)
+	if err != nil {
+		return nil, ReplaceResult{}, err
+	}
+	return rootDoc, ReplaceAll(rootDoc, rules, opts), nil
 }
 
 // apply runs the replacement rules on this unit.
