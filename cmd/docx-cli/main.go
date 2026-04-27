@@ -28,7 +28,7 @@ type Config struct {
 	Version      bool
 }
 
-var Version = "v0.1.3"
+var Version = "v0.1.4"
 
 func main() {
 	cfg := parseFlags()
