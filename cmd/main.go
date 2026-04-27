@@ -134,7 +134,7 @@ func main() {
 		fmt.Printf("警告: 输出文件已存在: %s\n", outputFile)
 		fmt.Print("是否覆盖? (y/N): ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
 			fmt.Println("操作已取消")
 			return
