@@ -25,11 +25,18 @@ type Config struct {
 	ToTS         bool
 	Workers      int
 	Help         bool
+	Version      bool
 }
+
+var Version = "v0.1.3"
 
 func main() {
 	cfg := parseFlags()
 
+	if cfg.Version {
+		printVersion()
+		return
+	}
 	if cfg.Help {
 		printHelp()
 		return
@@ -186,6 +193,8 @@ func parseFlags() *Config {
 	noHeaders := flagSet.Bool("no-headers", false, "跳过页眉部分")
 	noFooters := flagSet.Bool("no-footers", false, "跳过页脚部分")
 	verbose := flagSet.Bool("v", false, "显示详细处理信息")
+	version := flagSet.Bool("V", false, "显示版本号")
+	versionLong := flagSet.Bool("--version", false, "显示版本号")
 	verboseLong := flagSet.Bool("verbose", false, "显示详细处理信息")
 	extract := flagSet.Bool("extract", false, "仅提取文档中的所有文本")
 	toTS := flagSet.Bool("to-ts", false, "将 DOCX 转换为 TypeScript 源码")
@@ -195,7 +204,6 @@ func parseFlags() *Config {
 
 	_ = flagSet.Parse(os.Args[1:])
 	flagSet.Usage = printHelp
-
 	// 输入/输出
 	if *input != "" {
 		cfg.InputFile = *input
@@ -253,7 +261,7 @@ func parseFlags() *Config {
 	cfg.ToTS = *toTS
 	cfg.Workers = *workers
 	cfg.Help = *help || *helpLong
-
+	cfg.Version = *version || *versionLong
 	if cfg.Help {
 		printHelp()
 		os.Exit(0)
@@ -286,7 +294,7 @@ func loadReplacementsFromFile(filename string) []docxlib.ReplacementRule {
 }
 
 func printHelp() {
-	helpText := `docx-find-replace - 在 DOCX 文件中查找和替换文本
+	helpText := `docx-find-replace (%s)- 在 DOCX 文件中查找和替换文本
 
 用法:
   docx-find-replace -i <input> [选项]
@@ -319,5 +327,9 @@ func printHelp() {
     {"old": "要查找的文本", "new": "替换后的文本"}
   ]
 `
-	fmt.Print(helpText)
+	fmt.Print(fmt.Sprintf(helpText, Version))
+}
+
+func printVersion() {
+	fmt.Println(Version)
 }
