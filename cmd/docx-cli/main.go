@@ -36,7 +36,7 @@ type ReplacementRule struct {
 	New string `json:"new"`
 }
 
-var Version = "v0.2.0"
+var Version = "v0.2.1"
 
 // fileType returns the file type based on extension.
 func fileType(path string) string {
