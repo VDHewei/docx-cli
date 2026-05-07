@@ -1,0 +1,285 @@
+# Simplified Chinese translations for docx-cli
+
+[ErrInputRequired]
+description = "Error when no input file is specified"
+other = "错误: 必须指定输入文件 (-i 或 --input)"
+
+[ErrFileNotFound]
+description = "Error when input file does not exist"
+other = "输入文件不存在: {{.File}}"
+
+[ErrUnsupportedFileType]
+description = "Error when file extension is not .docx or .xlsx"
+other = "不支持的文件类型，仅支持 .docx 和 .xlsx 文件"
+
+[ErrOpenDocument]
+description = "Error when unable to open DOCX document"
+other = "无法打开文档: {{.Error}}"
+
+[ErrInvalidDocStructure]
+description = "Error when document structure is invalid"
+other = "文档结构无效"
+
+[ErrWriteTSFile]
+description = "Error when writing TypeScript file fails"
+other = "写入 TS 文件失败: {{.Error}}"
+
+[ErrNoReplacementRules]
+description = "Error when no replacement rules are specified"
+other = "错误: 必须至少指定一个替换规则 (-r 或 -f)，或使用 --extract 提取文本"
+
+[ErrOpenSpreadsheet]
+description = "Error when unable to open XLSX spreadsheet"
+other = "无法打开电子表格: {{.Error}}"
+
+[ErrTTSOnlyDocx]
+description = "Error when --to-ts is used with non-DOCX file"
+other = "错误: --to-ts 仅支持 DOCX 文件"
+
+[ErrOpenReplaceFile]
+description = "Error when unable to open replacement rules file"
+other = "无法打开替换文件: {{.Error}}"
+
+[ErrParseReplaceFile]
+description = "Error when unable to parse replacement rules file"
+other = "无法解析替换文件: {{.Error}}"
+
+[ErrCreateOutputDir]
+description = "Error when unable to create output directory"
+other = "无法创建输出目录: {{.Error}}"
+
+[ErrSaveDocument]
+description = "Error when saving DOCX document fails"
+other = "保存文档失败: {{.Error}}"
+
+[ErrSaveSpreadsheet]
+description = "Error when saving XLSX spreadsheet fails"
+other = "保存电子表格失败: {{.Error}}"
+
+[ErrI18nInit]
+description = "Error when i18n initialization fails"
+other = "国际化初始化失败: {{.Error}}"
+
+[WarnInvalidReplaceFormat]
+description = "Warning for malformed replacement format"
+other = "警告: 无效的替换格式 '{{.Format}}'，忽略"
+
+[WarnOutputFileExists]
+description = "Warning when output file already exists"
+other = "警告: 输出文件已存在: {{.File}}"
+
+[VerboseInputFile]
+description = "Verbose: showing input file and type"
+other = "输入文件: {{.File}} ({{.Type}})"
+
+[VerboseModeExtract]
+description = "Verbose: extract-only mode"
+other = "模式: 仅提取文本"
+
+[VerboseModeToTS]
+description = "Verbose: TypeScript conversion mode"
+other = "模式: 转换为 TypeScript"
+
+[VerboseReplaceCount]
+description = "Verbose: number of replacement rules"
+other = "替换规则数量: {{.Count}}"
+
+[VerboseWorkers]
+description = "Verbose: number of concurrent workers"
+other = "并发 workers: {{.Count}}"
+
+[VerboseSkipHeaders]
+description = "Verbose: headers are being skipped"
+other = "跳过页眉: 是"
+
+[VerboseSkipFooters]
+description = "Verbose: footers are being skipped"
+other = "跳过页脚: 是"
+
+[VerboseSkipSheets]
+description = "Verbose: sheets being skipped"
+other = "跳过工作表: {{.Sheets}}"
+
+[VerboseReplaceDone]
+description = "Verbose: replacement completed summary"
+other = "替换完成: 总计 {{.Count}} 次替换"
+
+[VerboseParagraphs]
+description = "Verbose: paragraphs processed count"
+other = "  段落: {{.Count}}"
+
+[VerboseCells]
+description = "Verbose: cells processed count"
+other = "  单元格: {{.Count}}"
+
+[VerboseHeaders]
+description = "Verbose: headers processed count"
+other = "  页眉: {{.Count}}"
+
+[VerboseFooters]
+description = "Verbose: footers processed count"
+other = "  页脚: {{.Count}}"
+
+[VerboseSheets]
+description = "Verbose: sheets processed count"
+other = "  工作表: {{.Count}}"
+
+[InfoExtractedTextCount]
+description = "Number of text segments extracted (DOCX)"
+other = "共提取到 {{.Count}} 段文本:"
+
+[InfoExtractedCellCount]
+description = "Number of cell texts extracted (XLSX)"
+other = "共提取到 {{.Count}} 个单元格文本:"
+
+[InfoExtractedTextSegCount]
+description = "Text segment count in final summary (DOCX)"
+other = "  提取文本段数: {{.Count}}"
+
+[InfoExtractedCellTextCount]
+description = "Cell text count in final summary (XLSX)"
+other = "  提取单元格数: {{.Count}}"
+
+[InfoTSFileGenerated]
+description = "TypeScript file generated successfully"
+other = "TypeScript 文件已生成: {{.File}}"
+
+[InfoOverwritePrompt]
+description = "Prompt asking if user wants to overwrite existing file"
+other = "是否覆盖? (y/N): "
+
+[InfoOperationCancelled]
+description = "User cancelled the overwrite operation"
+other = "操作已取消"
+
+[InfoSuccessDocx]
+description = "DOCX document processed and saved successfully"
+other = "\n成功处理并保存文档！"
+
+[InfoSuccessXlsx]
+description = "XLSX spreadsheet processed and saved successfully"
+other = "\n成功处理并保存电子表格！"
+
+[InfoTotalReplacements]
+description = "Total replacements made"
+other = "  总共进行了 {{.Count}} 次替换"
+
+[InfoProcessedParagraphs]
+description = "Paragraphs processed in final summary"
+other = "  处理了 {{.Count}} 个段落"
+
+[InfoProcessedCells]
+description = "Cells processed in final summary"
+other = "  处理了 {{.Count}} 个单元格"
+
+[InfoProcessedHeaders]
+description = "Headers processed in final summary"
+other = "  处理了 {{.Count}} 个页眉"
+
+[InfoProcessedFooters]
+description = "Footers processed in final summary"
+other = "  处理了 {{.Count}} 个页脚"
+
+[InfoProcessedSheets]
+description = "Sheets processed in final summary"
+other = "  涉及 {{.Count}} 个工作表"
+
+[InfoOutputFile]
+description = "Output file path"
+other = "  输出文件: {{.File}}"
+
+[InfoLangFileGenerated]
+description = "Language settings example file generated"
+other = "语言设置示例文件已生成: {{.File}}"
+
+[HelpHeader]
+description = "Help text header"
+other = "docx-find-replace (%s) - 在 DOCX/XLSX 文件中查找和替换文本"
+
+[HelpUsage]
+description = "Help usage section"
+other = "用法:"
+
+[HelpSupportedTypes]
+description = "Help supported file types section"
+other = "支持文件类型:"
+
+[HelpDocxDesc]
+description = "DOCX file type description in help"
+other = "Word 文档 (支持文本提取、替换、TypeScript 转换)"
+
+[HelpXlsxDesc]
+description = "XLSX file type description in help"
+other = "Excel 电子表格 (支持文本提取、替换，保持原单元格样式)"
+
+[HelpOptions]
+description = "Help options section header"
+other = "选项:"
+
+[HelpExamples]
+description = "Help examples section"
+other = "示例:"
+
+[HelpReplaceFileFmt]
+description = "Help replacement file format section"
+other = "替换文件格式 (JSON):"
+
+[FlagInputShort]
+description = "Flag: input file path"
+other = "输入文件路径 (.docx 或 .xlsx)"
+
+[FlagOutputShort]
+description = "Flag: output file path"
+other = "输出文件路径 (默认: <input>_replaced.<ext>)"
+
+[FlagReplaceShort]
+description = "Flag: replacement text"
+other = "替换文本 (可多次使用)"
+
+[FlagReplaceFileShort]
+description = "Flag: JSON replacement rules file"
+other = "JSON 文件，包含替换规则"
+
+[FlagNoHeaders]
+description = "Flag: skip headers"
+other = "跳过页眉部分 (仅 DOCX)"
+
+[FlagNoFooters]
+description = "Flag: skip footers"
+other = "跳过页脚部分 (仅 DOCX)"
+
+[FlagSkipSheets]
+description = "Flag: skip sheets pattern"
+other = "跳过指定工作表，多个用逗号分隔 (仅 XLSX)"
+
+[FlagSkipSheetsDetail]
+description = "Flag: skip sheets pattern detail"
+other = "支持模式: 精确匹配(Sheet1)、!否定(!Summary)、*.后缀(*.Data)、@regexp:正则"
+
+[FlagVerboseShort]
+description = "Flag: verbose output"
+other = "显示详细处理信息"
+
+[FlagVersionShort]
+description = "Flag: show version"
+other = "显示版本号"
+
+[FlagExtract]
+description = "Flag: extract only"
+other = "仅提取文件中的所有文本，不执行替换"
+
+[FlagToTS]
+description = "Flag: convert to TypeScript"
+other = "将 DOCX 转换为 TypeScript 源码 (仅 DOCX)"
+
+[FlagWorkers]
+description = "Flag: worker count"
+other = "并发 worker 数量 (默认: CPU 核心数)"
+
+[FlagHelpShort]
+description = "Flag: show help"
+other = "显示此帮助信息"
+
+[FlagLangSettingsFile]
+description = "Flag: language settings TOML file"
+other = "自定义语言翻译 TOML 文件路径；文件不存在时生成示例"

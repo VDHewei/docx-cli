@@ -1,0 +1,285 @@
+# English translations for docx-cli
+
+[ErrInputRequired]
+description = "Error when no input file is specified"
+other = "Error: input file required (-i or --input)"
+
+[ErrFileNotFound]
+description = "Error when input file does not exist"
+other = "Input file not found: {{.File}}"
+
+[ErrUnsupportedFileType]
+description = "Error when file extension is not .docx or .xlsx"
+other = "Unsupported file type; only .docx and .xlsx are supported"
+
+[ErrOpenDocument]
+description = "Error when unable to open DOCX document"
+other = "Cannot open document: {{.Error}}"
+
+[ErrInvalidDocStructure]
+description = "Error when document structure is invalid"
+other = "Invalid document structure"
+
+[ErrWriteTSFile]
+description = "Error when writing TypeScript file fails"
+other = "Failed to write TypeScript file: {{.Error}}"
+
+[ErrNoReplacementRules]
+description = "Error when no replacement rules are specified"
+other = "Error: at least one replacement rule (-r or -f) is required, or use --extract to extract text"
+
+[ErrOpenSpreadsheet]
+description = "Error when unable to open XLSX spreadsheet"
+other = "Cannot open spreadsheet: {{.Error}}"
+
+[ErrTTSOnlyDocx]
+description = "Error when --to-ts is used with non-DOCX file"
+other = "Error: --to-ts is only supported for DOCX files"
+
+[ErrOpenReplaceFile]
+description = "Error when unable to open replacement rules file"
+other = "Cannot open replacement file: {{.Error}}"
+
+[ErrParseReplaceFile]
+description = "Error when unable to parse replacement rules file"
+other = "Cannot parse replacement file: {{.Error}}"
+
+[ErrCreateOutputDir]
+description = "Error when unable to create output directory"
+other = "Cannot create output directory: {{.Error}}"
+
+[ErrSaveDocument]
+description = "Error when saving DOCX document fails"
+other = "Failed to save document: {{.Error}}"
+
+[ErrSaveSpreadsheet]
+description = "Error when saving XLSX spreadsheet fails"
+other = "Failed to save spreadsheet: {{.Error}}"
+
+[ErrI18nInit]
+description = "Error when i18n initialization fails"
+other = "i18n initialization failed: {{.Error}}"
+
+[WarnInvalidReplaceFormat]
+description = "Warning for malformed replacement format"
+other = "Warning: invalid replacement format '{{.Format}}', ignoring"
+
+[WarnOutputFileExists]
+description = "Warning when output file already exists"
+other = "Warning: output file already exists: {{.File}}"
+
+[VerboseInputFile]
+description = "Verbose: showing input file and type"
+other = "Input file: {{.File}} ({{.Type}})"
+
+[VerboseModeExtract]
+description = "Verbose: extract-only mode"
+other = "Mode: extract text only"
+
+[VerboseModeToTS]
+description = "Verbose: TypeScript conversion mode"
+other = "Mode: convert to TypeScript"
+
+[VerboseReplaceCount]
+description = "Verbose: number of replacement rules"
+other = "Replacement rules: {{.Count}}"
+
+[VerboseWorkers]
+description = "Verbose: number of concurrent workers"
+other = "Concurrent workers: {{.Count}}"
+
+[VerboseSkipHeaders]
+description = "Verbose: headers are being skipped"
+other = "Skip headers: yes"
+
+[VerboseSkipFooters]
+description = "Verbose: footers are being skipped"
+other = "Skip footers: yes"
+
+[VerboseSkipSheets]
+description = "Verbose: sheets being skipped"
+other = "Skip sheets: {{.Sheets}}"
+
+[VerboseReplaceDone]
+description = "Verbose: replacement completed summary"
+other = "Replacement done: {{.Count}} total replacements"
+
+[VerboseParagraphs]
+description = "Verbose: paragraphs processed count"
+other = "  Paragraphs: {{.Count}}"
+
+[VerboseCells]
+description = "Verbose: cells processed count"
+other = "  Cells: {{.Count}}"
+
+[VerboseHeaders]
+description = "Verbose: headers processed count"
+other = "  Headers: {{.Count}}"
+
+[VerboseFooters]
+description = "Verbose: footers processed count"
+other = "  Footers: {{.Count}}"
+
+[VerboseSheets]
+description = "Verbose: sheets processed count"
+other = "  Sheets: {{.Count}}"
+
+[InfoExtractedTextCount]
+description = "Number of text segments extracted (DOCX)"
+other = "Extracted {{.Count}} text segments:"
+
+[InfoExtractedCellCount]
+description = "Number of cell texts extracted (XLSX)"
+other = "Extracted {{.Count}} cell texts:"
+
+[InfoExtractedTextSegCount]
+description = "Text segment count in final summary (DOCX)"
+other = "  Text segments extracted: {{.Count}}"
+
+[InfoExtractedCellTextCount]
+description = "Cell text count in final summary (XLSX)"
+other = "  Cells extracted: {{.Count}}"
+
+[InfoTSFileGenerated]
+description = "TypeScript file generated successfully"
+other = "TypeScript file generated: {{.File}}"
+
+[InfoOverwritePrompt]
+description = "Prompt asking if user wants to overwrite existing file"
+other = "Overwrite? (y/N): "
+
+[InfoOperationCancelled]
+description = "User cancelled the overwrite operation"
+other = "Operation cancelled"
+
+[InfoSuccessDocx]
+description = "DOCX document processed and saved successfully"
+other = "\nDocument processed and saved successfully!"
+
+[InfoSuccessXlsx]
+description = "XLSX spreadsheet processed and saved successfully"
+other = "\nSpreadsheet processed and saved successfully!"
+
+[InfoTotalReplacements]
+description = "Total replacements made"
+other = "  Total replacements: {{.Count}}"
+
+[InfoProcessedParagraphs]
+description = "Paragraphs processed in final summary"
+other = "  Paragraphs processed: {{.Count}}"
+
+[InfoProcessedCells]
+description = "Cells processed in final summary"
+other = "  Cells processed: {{.Count}}"
+
+[InfoProcessedHeaders]
+description = "Headers processed in final summary"
+other = "  Headers processed: {{.Count}}"
+
+[InfoProcessedFooters]
+description = "Footers processed in final summary"
+other = "  Footers processed: {{.Count}}"
+
+[InfoProcessedSheets]
+description = "Sheets processed in final summary"
+other = "  Sheets processed: {{.Count}}"
+
+[InfoOutputFile]
+description = "Output file path"
+other = "  Output file: {{.File}}"
+
+[InfoLangFileGenerated]
+description = "Language settings example file generated"
+other = "Language settings example file generated: {{.File}}"
+
+[HelpHeader]
+description = "Help text header"
+other = "docx-find-replace (%s) - Find and replace text in DOCX/XLSX files"
+
+[HelpUsage]
+description = "Help usage section"
+other = "Usage:"
+
+[HelpSupportedTypes]
+description = "Help supported file types section"
+other = "Supported file types:"
+
+[HelpDocxDesc]
+description = "DOCX file type description in help"
+other = "Word document (text extraction, replacement, TypeScript conversion)"
+
+[HelpXlsxDesc]
+description = "XLSX file type description in help"
+other = "Excel spreadsheet (text extraction, replacement, preserving cell styles)"
+
+[HelpOptions]
+description = "Help options section header"
+other = "Options:"
+
+[HelpExamples]
+description = "Help examples section"
+other = "Examples:"
+
+[HelpReplaceFileFmt]
+description = "Help replacement file format section"
+other = "Replacement file format (JSON):"
+
+[FlagInputShort]
+description = "Flag: input file path"
+other = "Input file path (.docx or .xlsx)"
+
+[FlagOutputShort]
+description = "Flag: output file path"
+other = "Output file path (default: <input>_replaced.<ext>)"
+
+[FlagReplaceShort]
+description = "Flag: replacement text"
+other = "Replace text old=new (can be used multiple times)"
+
+[FlagReplaceFileShort]
+description = "Flag: JSON replacement rules file"
+other = "JSON file containing replacement rules"
+
+[FlagNoHeaders]
+description = "Flag: skip headers"
+other = "Skip headers (DOCX only)"
+
+[FlagNoFooters]
+description = "Flag: skip footers"
+other = "Skip footers (DOCX only)"
+
+[FlagSkipSheets]
+description = "Flag: skip sheets pattern"
+other = "Skip sheets, comma-separated patterns (XLSX only)"
+
+[FlagSkipSheetsDetail]
+description = "Flag: skip sheets pattern detail"
+other = "Patterns: exact(Sheet1), !negative(!Summary), *.suffix(*.Data), @regexp:regex"
+
+[FlagVerboseShort]
+description = "Flag: verbose output"
+other = "Show verbose processing info"
+
+[FlagVersionShort]
+description = "Flag: show version"
+other = "Show version number"
+
+[FlagExtract]
+description = "Flag: extract only"
+other = "Extract all text from file without replacement"
+
+[FlagToTS]
+description = "Flag: convert to TypeScript"
+other = "Convert DOCX to TypeScript source code (DOCX only)"
+
+[FlagWorkers]
+description = "Flag: worker count"
+other = "Number of concurrent workers (default: CPU cores)"
+
+[FlagHelpShort]
+description = "Flag: show help"
+other = "Show this help message"
+
+[FlagLangSettingsFile]
+description = "Flag: language settings TOML file"
+other = "Custom language translation TOML file path; generates example if file does not exist"
