@@ -1,6 +1,7 @@
 package xlsxlib
 
 import (
+	"bytes"
 	"runtime"
 	"strings"
 	"sync"
@@ -13,6 +14,10 @@ type ReplaceOptions struct {
 	Workers    int      // Number of concurrent workers; 0 or negative means runtime.NumCPU().
 	SkipSheets []string // skip scan text worksheet
 }
+
+type XlsxOptions = excelize.Options
+
+var OpenReader = excelize.OpenReader
 
 func (o ReplaceOptions) CheckSkip(sheet string) bool {
 	for _, vs := range o.SkipSheets {
@@ -150,4 +155,15 @@ func replaceCell(f *excelize.File, sheet, cell string, rules []ReplacementRule) 
 	}
 
 	return count
+}
+
+// ReplaceAllByBytes performs concurrent find-and-replace across all sheets in the spreadsheet.
+// It preserves the original cell style (font, alignment, borders, fill, number format, width, height).
+func ReplaceAllByBytes(data []byte, rules []ReplacementRule, opts ReplaceOptions, xlsxOpts ...XlsxOptions) (*excelize.File,
+	ReplaceResult, error) {
+	xlsx, err := excelize.OpenReader(bytes.NewReader(data), xlsxOpts...)
+	if err != nil {
+		return nil, ReplaceResult{}, err
+	}
+	return xlsx, ReplaceAll(xlsx, rules, opts), nil
 }
