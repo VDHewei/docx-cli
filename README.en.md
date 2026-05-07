@@ -61,6 +61,12 @@ docx-find-replace -i input.xlsx -f replacements.json
 # Skip headers/footers (DOCX only)
 docx-find-replace -i input.docx -r "old=new" --no-headers --no-footers
 
+# Skip specific sheets (XLSX only, supports pattern matching)
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "Sheet1,Sheet2"  # exact match (comma-separated)
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "!Summary"       # skip sheets NOT containing "Summary"
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "*.Data"         # skip sheets ending with ".Data"
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "@regexp:^Cfg"   # skip sheets matching regex
+
 # Specify worker count
 docx-find-replace -i input.docx -r "old=new" --workers 8
 docx-find-replace -i input.xlsx -r "old=new" --workers 8

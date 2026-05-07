@@ -1,6 +1,7 @@
 package xlsxlib
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -353,5 +354,341 @@ func TestIntegration_SaveAndReopen(t *testing.T) {
 	}
 	if val != "Goodbye World" {
 		t.Errorf("期望 'Goodbye World'，实际 '%s'", val)
+	}
+}
+
+// --- resolveMatcher tests ---
+
+func TestResolveMatcher_EmptyPattern(t *testing.T) {
+	handler := resolveMatcher("")
+	if !handler("") {
+		t.Error("空模式应匹配空字符串")
+	}
+	if handler("Sheet1") {
+		t.Error("空模式不应匹配非空字符串")
+	}
+}
+
+func TestResolveMatcher_ExactMatch(t *testing.T) {
+	handler := resolveMatcher("Sheet1")
+	if !handler("Sheet1") {
+		t.Error("应匹配 'Sheet1'")
+	}
+	if !handler("SHEET1") {
+		t.Error("精确匹配应不区分大小写")
+	}
+	if handler("Sheet2") {
+		t.Error("不应匹配 'Sheet2'")
+	}
+}
+
+func TestResolveMatcher_NegativeSubstring(t *testing.T) {
+	handler := resolveMatcher("!Summary")
+	if !handler("Data") {
+		t.Error("不含 'Summary' 的名称应匹配")
+	}
+	if !handler("DetailSheet") {
+		t.Error("不含 'Summary' 的名称应匹配")
+	}
+	if handler("Summary") {
+		t.Error("包含 'Summary' 的名称不应匹配否定模式")
+	}
+	if handler("SummaryReport") {
+		t.Error("包含 'Summary' 的名称不应匹配否定模式")
+	}
+}
+
+func TestResolveMatcher_SuffixMatch(t *testing.T) {
+	handler := resolveMatcher("*.Data")
+	if !handler("Sales.Data") {
+		t.Error("以 '.Data' 结尾的名称应匹配")
+	}
+	if handler("DataSheet") {
+		t.Error("不以 '.Data' 结尾的名称不应匹配")
+	}
+}
+
+func TestResolveMatcher_RegexpMatch(t *testing.T) {
+	handler := resolveMatcher("@regexp:^Sheet\\d+$")
+	if !handler("Sheet1") {
+		t.Error("应匹配 'Sheet1'")
+	}
+	if !handler("Sheet99") {
+		t.Error("应匹配 'Sheet99'")
+	}
+	if handler("SheetA") {
+		t.Error("不应匹配 'SheetA'")
+	}
+	if handler("MySheet1") {
+		t.Error("不应匹配 'MySheet1'（不以 Sheet 开头）")
+	}
+}
+
+// --- CheckSkip tests ---
+
+func TestCheckSkip_NoPatterns(t *testing.T) {
+	opts := ReplaceOptions{SkipSheets: nil}
+	if opts.CheckSkip("Sheet1") {
+		t.Error("无模式时不应跳过任何工作表")
+	}
+}
+
+func TestCheckSkip_ExactMatch(t *testing.T) {
+	opts := ReplaceOptions{SkipSheets: []string{"Sheet1"}}
+	if !opts.CheckSkip("Sheet1") {
+		t.Error("应跳过 'Sheet1'")
+	}
+	if opts.CheckSkip("Sheet2") {
+		t.Error("不应跳过 'Sheet2'")
+	}
+}
+
+func TestCheckSkip_MultiplePatterns(t *testing.T) {
+	opts := ReplaceOptions{SkipSheets: []string{"Sheet1", "!Data"}}
+	if !opts.CheckSkip("Sheet1") {
+		t.Error("应跳过 'Sheet1'（精确匹配）")
+	}
+	if !opts.CheckSkip("Report") {
+		t.Error("应跳过 'Report'（不含 'Data'）")
+	}
+	if opts.CheckSkip("DataSummary") {
+		t.Error("不应跳过包含 'Data' 的工作表")
+	}
+}
+
+// --- ReplaceAll with SkipSheets ---
+
+func TestReplaceAll_SkipSheets(t *testing.T) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.NewSheet("Sheet2")
+	f.SetCellValue("Sheet2", "A1", "Hello Again")
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	result := ReplaceAll(f, rules, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"Sheet2"},
+	})
+
+	if result.TotalReplacements != 1 {
+		t.Errorf("期望替换 1 次（跳过 Sheet2），实际 %d", result.TotalReplacements)
+	}
+	if result.SheetsProcessed != 1 {
+		t.Errorf("期望处理 1 个工作表，实际 %d", result.SheetsProcessed)
+	}
+
+	val1, _ := f.GetCellValue("Sheet1", "A1")
+	val2, _ := f.GetCellValue("Sheet2", "A1")
+	if val1 != "Hi World" {
+		t.Errorf("Sheet1 A1 期望 'Hi World'，实际 '%s'", val1)
+	}
+	if val2 != "Hello Again" {
+		t.Errorf("Sheet2 A1 应未被修改，实际 '%s'", val2)
+	}
+}
+
+func TestReplaceAll_SkipSheets_NegativePattern(t *testing.T) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.NewSheet("Summary")
+	f.SetCellValue("Summary", "A1", "Hello Summary")
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	result := ReplaceAll(f, rules, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"!Summary"}, // skip sheets NOT containing "Summary"
+	})
+
+	if result.TotalReplacements != 1 {
+		t.Errorf("期望替换 1 次（仅处理 Summary），实际 %d", result.TotalReplacements)
+	}
+
+	val1, _ := f.GetCellValue("Sheet1", "A1")
+	val2, _ := f.GetCellValue("Summary", "A1")
+	if val1 != "Hello World" {
+		t.Errorf("Sheet1 应被跳过，实际 '%s'", val1)
+	}
+	if val2 != "Hi Summary" {
+		t.Errorf("Summary A1 期望 'Hi Summary'，实际 '%s'", val2)
+	}
+}
+
+func TestReplaceAll_SkipSheets_SuffixPattern(t *testing.T) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.NewSheet("Sales.Data")
+	f.SetCellValue("Sales.Data", "A1", "Hello Data")
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	result := ReplaceAll(f, rules, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"*.Data"}, // skip sheets ending with ".Data"
+	})
+
+	if result.TotalReplacements != 1 {
+		t.Errorf("期望替换 1 次（跳过 *.Data），实际 %d", result.TotalReplacements)
+	}
+
+	val1, _ := f.GetCellValue("Sheet1", "A1")
+	val2, _ := f.GetCellValue("Sales.Data", "A1")
+	if val1 != "Hi World" {
+		t.Errorf("Sheet1 A1 期望 'Hi World'，实际 '%s'", val1)
+	}
+	if val2 != "Hello Data" {
+		t.Errorf("Sales.Data A1 应被跳过，实际 '%s'", val2)
+	}
+}
+
+func TestReplaceAll_SkipSheets_RegexpPattern(t *testing.T) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.NewSheet("Config")
+	f.SetCellValue("Config", "A1", "Hello Config")
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	result := ReplaceAll(f, rules, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"@regexp:^Sheet\\d+$"}, // skip sheets matching regex
+	})
+
+	if result.TotalReplacements != 1 {
+		t.Errorf("期望替换 1 次（跳过正则匹配的工作表），实际 %d", result.TotalReplacements)
+	}
+
+	val1, _ := f.GetCellValue("Sheet1", "A1")
+	val2, _ := f.GetCellValue("Config", "A1")
+	if val1 != "Hello World" {
+		t.Errorf("Sheet1 应被跳过，实际 '%s'", val1)
+	}
+	if val2 != "Hi Config" {
+		t.Errorf("Config A1 期望 'Hi Config'，实际 '%s'", val2)
+	}
+}
+
+// --- ReplaceAllByBytes tests ---
+
+func TestReplaceAllByBytes_Basic(t *testing.T) {
+	f := excelize.NewFile()
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.SetCellValue("Sheet1", "A2", "Hello Go")
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		t.Fatalf("写入缓冲区失败: %v", err)
+	}
+	f.Close()
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	xlsx, result, err := ReplaceAllByBytes(buf.Bytes(), rules, ReplaceOptions{Workers: 1})
+	if err != nil {
+		t.Fatalf("ReplaceAllByBytes 失败: %v", err)
+	}
+	defer xlsx.Close()
+
+	if result.TotalReplacements != 2 {
+		t.Errorf("期望替换 2 次，实际 %d", result.TotalReplacements)
+	}
+	if result.CellsProcessed != 2 {
+		t.Errorf("期望处理 2 个单元格，实际 %d", result.CellsProcessed)
+	}
+
+	val1, _ := xlsx.GetCellValue("Sheet1", "A1")
+	val2, _ := xlsx.GetCellValue("Sheet1", "A2")
+	if val1 != "Hi World" {
+		t.Errorf("A1 期望 'Hi World'，实际 '%s'", val1)
+	}
+	if val2 != "Hi Go" {
+		t.Errorf("A2 期望 'Hi Go'，实际 '%s'", val2)
+	}
+}
+
+func TestReplaceAllByBytes_InvalidData(t *testing.T) {
+	_, _, err := ReplaceAllByBytes([]byte("not an xlsx"), nil, ReplaceOptions{})
+	if err == nil {
+		t.Error("期望返回错误，但得到 nil")
+	}
+}
+
+func TestReplaceAllByBytes_WithSkipSheets(t *testing.T) {
+	f := excelize.NewFile()
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.NewSheet("Sheet2")
+	f.SetCellValue("Sheet2", "A1", "Hello Skip")
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		t.Fatalf("写入缓冲区失败: %v", err)
+	}
+	f.Close()
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	xlsx, result, err := ReplaceAllByBytes(buf.Bytes(), rules, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"Sheet2"},
+	})
+	if err != nil {
+		t.Fatalf("ReplaceAllByBytes 失败: %v", err)
+	}
+	defer xlsx.Close()
+
+	if result.TotalReplacements != 1 {
+		t.Errorf("期望替换 1 次（跳过 Sheet2），实际 %d", result.TotalReplacements)
+	}
+
+	val1, _ := xlsx.GetCellValue("Sheet1", "A1")
+	val2, _ := xlsx.GetCellValue("Sheet2", "A1")
+	if val1 != "Hi World" {
+		t.Errorf("Sheet1 A1 期望 'Hi World'，实际 '%s'", val1)
+	}
+	if val2 != "Hello Skip" {
+		t.Errorf("Sheet2 A1 应未被修改，实际 '%s'", val2)
+	}
+}
+
+func TestReplaceAllByBytes_PreservesStyle(t *testing.T) {
+	f := excelize.NewFile()
+	styleID, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Size: 14},
+	})
+	f.SetCellValue("Sheet1", "A1", "Hello World")
+	f.SetCellStyle("Sheet1", "A1", "A1", styleID)
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		t.Fatalf("写入缓冲区失败: %v", err)
+	}
+	f.Close()
+
+	rules := []ReplacementRule{{Old: "Hello", New: "Hi"}}
+	xlsx, result, err := ReplaceAllByBytes(buf.Bytes(), rules, ReplaceOptions{Workers: 1})
+	if err != nil {
+		t.Fatalf("ReplaceAllByBytes 失败: %v", err)
+	}
+	defer xlsx.Close()
+
+	if result.TotalReplacements != 1 {
+		t.Fatalf("期望替换 1 次，实际 %d", result.TotalReplacements)
+	}
+
+	val, _ := xlsx.GetCellValue("Sheet1", "A1")
+	if val != "Hi World" {
+		t.Errorf("期望 'Hi World'，实际 '%s'", val)
+	}
+
+	styleAfter, _ := xlsx.GetCellStyle("Sheet1", "A1")
+	styleDetail, _ := xlsx.GetStyle(styleAfter)
+	if styleDetail.Font == nil || !styleDetail.Font.Bold {
+		t.Error("粗体样式未保留")
+	}
+	if styleDetail.Font.Size != 14 {
+		t.Errorf("字体大小未保留: 期望 14，实际 %f", styleDetail.Font.Size)
 	}
 }

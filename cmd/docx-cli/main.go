@@ -22,6 +22,7 @@ type Config struct {
 	Replacements []ReplacementRule
 	NoHeaders    bool
 	NoFooters    bool
+	SkipSheets   []string
 	Verbose      bool
 	ExtractOnly  bool
 	ToTS         bool
@@ -227,6 +228,9 @@ func processXlsx(cfg *Config) {
 			fmt.Printf("替换规则数量: %d\n", len(cfg.Replacements))
 			fmt.Printf("并发 workers: %d\n", cfg.Workers)
 		}
+		if len(cfg.SkipSheets) > 0 {
+			fmt.Printf("跳过工作表: %s\n", strings.Join(cfg.SkipSheets, ", "))
+		}
 		fmt.Println()
 	}
 
@@ -253,7 +257,8 @@ func processXlsx(cfg *Config) {
 	xlsxRules := toXlsxRules(cfg.Replacements)
 	allTexts := xlsxlib.ExtractAllText(f)
 	result := xlsxlib.ReplaceAll(f, xlsxRules, xlsxlib.ReplaceOptions{
-		Workers: cfg.Workers,
+		Workers:    cfg.Workers,
+		SkipSheets: cfg.SkipSheets,
 	})
 
 	if cfg.Verbose {
@@ -334,6 +339,7 @@ func parseFlags() *Config {
 	replaceFileLong := flagSet.String("replace-file", "", "JSON 替换规则文件")
 	noHeaders := flagSet.Bool("no-headers", false, "跳过页眉部分 (仅 DOCX)")
 	noFooters := flagSet.Bool("no-footers", false, "跳过页脚部分 (仅 DOCX)")
+	skipSheets := flagSet.String("skip-sheets", "", "跳过指定工作表，多个用逗号分隔 (仅 XLSX，支持模式: 精确匹配、!否定、*.后缀、@regexp:正则)")
 	verbose := flagSet.Bool("v", false, "显示详细处理信息")
 	version := flagSet.Bool("V", false, "显示版本号")
 	versionLong := flagSet.Bool("version", false, "显示版本号")
@@ -399,6 +405,12 @@ func parseFlags() *Config {
 
 	cfg.NoHeaders = *noHeaders
 	cfg.NoFooters = *noFooters
+	if *skipSheets != "" {
+		cfg.SkipSheets = strings.Split(*skipSheets, ",")
+		for i := range cfg.SkipSheets {
+			cfg.SkipSheets[i] = strings.TrimSpace(cfg.SkipSheets[i])
+		}
+	}
 	cfg.Verbose = *verbose || *verboseLong
 	cfg.ExtractOnly = *extract
 	cfg.ToTS = *toTS
@@ -455,6 +467,8 @@ func printHelp() {
       --to-ts                将 DOCX 转换为 TypeScript 源码 (仅 DOCX)
       --no-headers           跳过页眉部分 (仅 DOCX)
       --no-footers           跳过页脚部分 (仅 DOCX)
+      --skip-sheets <patterns> 跳过指定工作表，多个用逗号分隔 (仅 XLSX)
+                             支持模式: 精确匹配(Sheet1)、!否定(!Summary)、*.后缀(*.Data)、@regexp:正则
       --workers <n>          并发 worker 数量 (默认: CPU 核心数)
   -v, --verbose              显示详细处理信息
   -V, --version              显示版本号
@@ -475,6 +489,12 @@ func printHelp() {
 
   # 使用 JSON 替换规则文件
   docx-find-replace -i input.xlsx -f rules.json
+
+  # 跳过指定工作表 (仅 XLSX，支持模式匹配)
+  docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "Sheet1,Sheet2"
+  docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "!Summary"
+  docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "*.Data"
+  docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "@regexp:^Config"
 
   # 转换为 TypeScript
   docx-find-replace -i input.docx --to-ts -o output.ts

@@ -61,6 +61,12 @@ docx-find-replace -i input.xlsx -f replacements.json
 # 跳过页眉页脚（仅 DOCX）
 docx-find-replace -i input.docx -r "old=new" --no-headers --no-footers
 
+# 跳过指定工作表（仅 XLSX，支持模式匹配）
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "Sheet1,Sheet2"  # 精确匹配（逗号分隔）
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "!Summary"       # 跳过名称不包含 "Summary" 的工作表
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "*.Data"         # 跳过名称以 ".Data" 结尾的工作表
+docx-find-replace -i input.xlsx -r "old=new" --skip-sheets "@regexp:^Cfg"   # 跳过名称匹配正则表达式的工作表
+
 # 指定并发 Worker 数
 docx-find-replace -i input.docx -r "old=new" --workers 8
 docx-find-replace -i input.xlsx -r "old=new" --workers 8

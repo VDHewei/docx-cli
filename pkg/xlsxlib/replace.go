@@ -2,6 +2,7 @@ package xlsxlib
 
 import (
 	"bytes"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -12,20 +13,69 @@ import (
 // ReplaceOptions controls replacement behavior.
 type ReplaceOptions struct {
 	Workers    int      // Number of concurrent workers; 0 or negative means runtime.NumCPU().
-	SkipSheets []string // skip scan text worksheet
+	SkipSheets []string // Sheet name patterns to skip during replacement. Supports four pattern types:
+	//   - exact match (case-insensitive): "Sheet1" matches sheets named "Sheet1", "SHEET1", etc.
+	//   - negative substring match (prefix "!"): "!Summary" matches sheets whose name does NOT contain "Summary".
+	//   - suffix match (prefix "*."): "*.Data" matches sheets whose name ends with ".Data".
+	//   - regex match (prefix "@regexp:"): "@regexp:^Sheet\\d+$" matches sheets via a regular expression.
 }
 
+// XlsxOptions is a type alias for excelize.Options, used for passing options when opening XLSX files.
 type XlsxOptions = excelize.Options
 
+// MatchHandler is a function type that returns true if the given sheet name matches a skip pattern.
+type MatchHandler func(string) bool
+
+// OpenReader is a package-level variable that holds the function used to open an XLSX from an io.Reader.
+// It defaults to excelize.OpenReader and can be replaced in tests for mocking.
 var OpenReader = excelize.OpenReader
 
+// CheckSkip returns true if the given sheet name matches any of the SkipSheets patterns.
+// A matched sheet will be skipped during replacement.
 func (o ReplaceOptions) CheckSkip(sheet string) bool {
+	var filters []MatchHandler
 	for _, vs := range o.SkipSheets {
-		if vs == sheet {
+		filters = append(filters, resolveMatcher(vs))
+	}
+	for _, filter := range filters {
+		if filter(sheet) {
 			return true
 		}
 	}
 	return false
+}
+
+// resolveMatcher converts a pattern string into a MatchHandler function.
+// The pattern syntax supports four modes:
+//   - "!" prefix: negative substring match — matches sheets whose name does NOT contain the rest.
+//   - "*." prefix: suffix match — matches sheets whose name ends with the rest.
+//   - "@regexp:" prefix: regular expression match — matches sheets via the given regex.
+//   - default: case-insensitive exact match.
+func resolveMatcher(pattern string) MatchHandler {
+	if pattern == "" {
+		return func(v string) bool {
+			return v == ""
+		}
+	}
+	switch {
+	case strings.HasPrefix(pattern, "!"):
+		return func(s string) bool {
+			return !strings.Contains(s, pattern[1:])
+		}
+	case strings.HasPrefix(pattern, "*."):
+		return func(s string) bool {
+			return strings.HasSuffix(s, pattern[2:])
+		}
+	case strings.HasPrefix(pattern, "@regexp:"):
+		var reg = regexp.MustCompile(pattern[8:])
+		return func(s string) bool {
+			return reg.MatchString(s)
+		}
+	default:
+		return func(s string) bool {
+			return strings.EqualFold(s, pattern)
+		}
+	}
 }
 
 // ReplaceAll performs concurrent find-and-replace across all sheets in the spreadsheet.
