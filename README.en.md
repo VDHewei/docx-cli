@@ -22,6 +22,7 @@
 - **Style Preservation**: Retains original text styles (font, bold, italic, color, size, etc.) in DOCX; preserve cell styles (font, alignment, borders, fill, number format, width, height) in XLSX
 - **TypeScript Conversion**: Convert DOCX documents to TypeScript source code for [docx.js](https://www.npmjs.com/package/docx)
 - **Image Support**: Extract embedded images and embed them as Base64 in generated TypeScript
+- **i18n**: Built-in support for Chinese (zh), Traditional Chinese (zh-TW), and English (en); auto-detects system locale; supports custom language extensions via TOML files
 
 ### Installation
 
@@ -72,6 +73,40 @@ docx-find-replace -i input.docx -r "old=new" --workers 8
 docx-find-replace -i input.xlsx -r "old=new" --workers 8
 ```
 
+#### Internationalization (i18n)
+
+The CLI auto-detects your system locale and displays output in the matching language (zh, zh-TW, or en). Unsupported locales fall back to English.
+
+```bash
+# Force a specific locale via environment variable
+LANG=zh docx-find-replace -i input.docx --extract       # Simplified Chinese
+LANG=zh-TW docx-find-replace -i input.xlsx --extract    # Traditional Chinese
+LANG=en docx-find-replace -i input.docx -r "old=new"    # English
+```
+
+You can extend or override translations with a custom TOML file:
+
+```bash
+# Generate an example TOML with all translatable keys
+docx-find-replace --lang-settings-file custom_ja.toml
+
+# Use a custom TOML for another run
+docx-find-replace -i input.docx -r "old=new" --lang-settings-file custom_ja.toml
+```
+
+The custom TOML file format declares the language inside `[meta]`:
+
+```toml
+[meta]
+language = "ja"    # BCP 47 language tag
+
+[ErrInputRequired]
+other = "エラー: 入力ファイルを指定してください (-i または --input)"
+
+[FlagInputShort]
+other = "入力ファイルパス (.docx または .xlsx)"
+```
+
 #### Extract Text
 
 ```bash
@@ -118,6 +153,12 @@ docx-cli/
 │   ├── extract.go    # Text extraction
 │   ├── replace.go    # Replacement logic
 │   └── xlsxlib_test.go
+├── pkg/i18n/         # Internationalization
+│   ├── i18n.go       # Core: Bundle, Localizer, T()
+│   ├── keys.go       # Message key constants
+│   ├── embed.go      # Embedded locale files
+│   ├── gen.go        # Example TOML generator
+│   └── locales/      # Built-in translations (zh, zh-TW, en)
 ├── assets/           # Static assets
 │   └── logo.svg
 ├── tests/            # Test files
@@ -141,6 +182,7 @@ This project uses the following open-source projects:
 
 - [gomutex/godocx](https://github.com/gomutex/godocx) — Go DOCX parsing library, [MIT License](https://opensource.org/licenses/MIT)
 - [xuri/excelize](https://github.com/xuri/excelize) — Go XLSX parsing library, [BSD-3 License](https://opensource.org/licenses/BSD-3-Clause)
+- [nicksnyder/go-i18n](https://github.com/nicksnyder/go-i18n) — Go i18n library, [MIT License](https://opensource.org/licenses/MIT)
 - [docx](https://github.com/dolanmiu/docx) (docx.js) — TypeScript DOCX generation library, [MIT License](https://opensource.org/licenses/MIT)
 
 ### License

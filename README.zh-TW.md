@@ -22,6 +22,7 @@
 - **樣式保留**：DOCX 替換時保留原始文字樣式（字體、粗體、斜體、顏色、大小等）；XLSX 替換時保留儲存格樣式（字體、對齊、邊框、填充、數字格式、欄寬、行高）
 - **TypeScript 轉換**：將 DOCX 文件轉換為 `docx.js` 可用的 TypeScript 原始碼
 - **圖片支援**：提取內嵌圖片並以 Base64 形式嵌入生成的 TypeScript
+- **國際化 (i18n)**：內建簡體中文 (zh)、繁體中文 (zh-TW)、英文 (en) 支援；自動偵測系統語言；支援透過 TOML 檔案擴充自訂語言
 
 ### 安裝
 
@@ -72,6 +73,40 @@ docx-find-replace -i input.docx -r "old=new" --workers 8
 docx-find-replace -i input.xlsx -r "old=new" --workers 8
 ```
 
+#### 國際化 (i18n)
+
+CLI 自動偵測系統語言並顯示對應語言的輸出（zh、zh-TW 或 en）。不支援的語言預設回退為英文。
+
+```bash
+# 透過環境變數指定語言
+LANG=zh docx-find-replace -i input.docx --extract       # 簡體中文
+LANG=zh-TW docx-find-replace -i input.xlsx --extract    # 繁體中文
+LANG=en docx-find-replace -i input.docx -r "old=new"    # 英文
+```
+
+可透過自訂 TOML 檔案擴充或覆蓋翻譯：
+
+```bash
+# 生成包含所有可翻譯鍵的範例 TOML 檔案
+docx-find-replace --lang-settings-file custom_ja.toml
+
+# 使用自訂 TOML 檔案執行
+docx-find-replace -i input.docx -r "old=new" --lang-settings-file custom_ja.toml
+```
+
+自訂 TOML 檔案格式透過 `[meta]` 宣告目標語言：
+
+```toml
+[meta]
+language = "ja"    # BCP 47 語言標籤
+
+[ErrInputRequired]
+other = "エラー: 入力ファイルを指定してください (-i または --input)"
+
+[FlagInputShort]
+other = "入力ファイルパス (.docx または .xlsx)"
+```
+
 #### 提取文字
 
 ```bash
@@ -118,6 +153,12 @@ docx-cli/
 │   ├── extract.go    # 文字提取
 │   ├── replace.go    # 替換邏輯
 │   └── xlsxlib_test.go
+├── pkg/i18n/         # 國際化
+│   ├── i18n.go       # 核心: Bundle, Localizer, T()
+│   ├── keys.go       # 訊息鍵常量
+│   ├── embed.go      # 嵌入語言檔案
+│   ├── gen.go        # 範例 TOML 生成器
+│   └── locales/      # 內建翻譯 (zh, zh-TW, en)
 ├── assets/           # 靜態資源
 │   └── logo.svg
 ├── tests/            # 測試文件
@@ -141,6 +182,7 @@ go test ./...
 
 - [gomutex/godocx](https://github.com/gomutex/godocx) — Go DOCX 解析庫，[MIT License](https://opensource.org/licenses/MIT)
 - [xuri/excelize](https://github.com/xuri/excelize) — Go XLSX 解析庫，[BSD-3 License](https://opensource.org/licenses/BSD-3-Clause)
+- [nicksnyder/go-i18n](https://github.com/nicksnyder/go-i18n) — Go 國際化庫，[MIT License](https://opensource.org/licenses/MIT)
 - [docx](https://github.com/dolanmiu/docx) (docx.js) — TypeScript DOCX 生成庫，[MIT License](https://opensource.org/licenses/MIT)
 
 ### 開源協議
