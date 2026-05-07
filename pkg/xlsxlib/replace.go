@@ -10,7 +10,17 @@ import (
 
 // ReplaceOptions controls replacement behavior.
 type ReplaceOptions struct {
-	Workers int // Number of concurrent workers; 0 or negative means runtime.NumCPU().
+	Workers    int      // Number of concurrent workers; 0 or negative means runtime.NumCPU().
+	SkipSheets []string // skip scan text worksheet
+}
+
+func (o ReplaceOptions) CheckSkip(sheet string) bool {
+	for _, vs := range o.SkipSheets {
+		if vs == sheet {
+			return true
+		}
+	}
+	return false
 }
 
 // ReplaceAll performs concurrent find-and-replace across all sheets in the spreadsheet.
@@ -34,6 +44,9 @@ func ReplaceAll(f *excelize.File, rules []ReplacementRule, opts ReplaceOptions) 
 
 	var jobs []cellWork
 	for _, sheet := range f.GetSheetList() {
+		if opts.CheckSkip(sheet) {
+			continue
+		}
 		rows, err := f.GetRows(sheet)
 		if err != nil {
 			continue
