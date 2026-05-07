@@ -10,14 +10,16 @@ import (
 	"strings"
 
 	"github.com/VDHewei/docx-cli/pkg/docxlib"
+	"github.com/VDHewei/docx-cli/pkg/xlsxlib"
 	"github.com/gomutex/godocx"
+	"github.com/xuri/excelize/v2"
 )
 
 // Config 命令行配置
 type Config struct {
 	InputFile    string
 	OutputFile   string
-	Replacements []docxlib.ReplacementRule
+	Replacements []ReplacementRule
 	NoHeaders    bool
 	NoFooters    bool
 	Verbose      bool
@@ -28,7 +30,26 @@ type Config struct {
 	Version      bool
 }
 
-var Version = "v0.1.6"
+// ReplacementRule is a unified replacement rule used by the CLI layer.
+type ReplacementRule struct {
+	Old string `json:"old"`
+	New string `json:"new"`
+}
+
+var Version = "v0.2.0"
+
+// fileType returns the file type based on extension.
+func fileType(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".docx":
+		return "docx"
+	case ".xlsx":
+		return "xlsx"
+	default:
+		return ""
+	}
+}
 
 func main() {
 	cfg := parseFlags()
@@ -50,6 +71,20 @@ func main() {
 		log.Fatalf("输入文件不存在: %s", cfg.InputFile)
 	}
 
+	ft := fileType(cfg.InputFile)
+	if ft == "" {
+		log.Fatalf("不支持的文件类型，仅支持 .docx 和 .xlsx 文件")
+	}
+
+	switch ft {
+	case "docx":
+		processDocx(cfg)
+	case "xlsx":
+		processXlsx(cfg)
+	}
+}
+
+func processDocx(cfg *Config) {
 	rootDoc, err := godocx.OpenDocument(cfg.InputFile)
 	if err != nil {
 		log.Fatalf("无法打开文档: %v", err)
@@ -59,7 +94,7 @@ func main() {
 	}
 
 	if cfg.Verbose {
-		fmt.Printf("输入文件: %s\n", cfg.InputFile)
+		fmt.Printf("输入文件: %s (DOCX)\n", cfg.InputFile)
 		if cfg.ExtractOnly {
 			fmt.Println("模式: 仅提取文本")
 		} else if cfg.ToTS {
@@ -113,8 +148,9 @@ func main() {
 	}
 
 	// 3. 执行并发替换
+	docxRules := toDocxRules(cfg.Replacements)
 	allTexts := docxlib.ExtractAllText(rootDoc)
-	result := docxlib.ReplaceAll(rootDoc, cfg.Replacements, docxlib.ReplaceOptions{
+	result := docxlib.ReplaceAll(rootDoc, docxRules, docxlib.ReplaceOptions{
 		SkipHeaders: cfg.NoHeaders,
 		SkipFooters: cfg.NoFooters,
 		Workers:     cfg.Workers,
@@ -176,27 +212,133 @@ func main() {
 	fmt.Printf("  输出文件: %s\n", outputFile)
 }
 
+func processXlsx(cfg *Config) {
+	f, err := excelize.OpenFile(cfg.InputFile)
+	if err != nil {
+		log.Fatalf("无法打开电子表格: %v", err)
+	}
+	defer f.Close()
+
+	if cfg.Verbose {
+		fmt.Printf("输入文件: %s (XLSX)\n", cfg.InputFile)
+		if cfg.ExtractOnly {
+			fmt.Println("模式: 仅提取文本")
+		} else {
+			fmt.Printf("替换规则数量: %d\n", len(cfg.Replacements))
+			fmt.Printf("并发 workers: %d\n", cfg.Workers)
+		}
+		fmt.Println()
+	}
+
+	// 1. 仅提取文本
+	if cfg.ExtractOnly {
+		allTexts := xlsxlib.ExtractAllText(f)
+		fmt.Printf("共提取到 %d 个单元格文本:\n\n", len(allTexts))
+		for _, ct := range allTexts {
+			fmt.Printf("  [%s!%s] %s\n", ct.Location.Sheet, ct.Location.Cell, ct.Text)
+		}
+		return
+	}
+
+	// --to-ts is not supported for xlsx
+	if cfg.ToTS {
+		log.Fatal("错误: --to-ts 仅支持 DOCX 文件")
+	}
+
+	if len(cfg.Replacements) == 0 {
+		log.Fatal("错误: 必须至少指定一个替换规则 (-r 或 -f)，或使用 --extract 提取文本")
+	}
+
+	// 2. 执行并发替换
+	xlsxRules := toXlsxRules(cfg.Replacements)
+	allTexts := xlsxlib.ExtractAllText(f)
+	result := xlsxlib.ReplaceAll(f, xlsxRules, xlsxlib.ReplaceOptions{
+		Workers: cfg.Workers,
+	})
+
+	if cfg.Verbose {
+		fmt.Printf("替换完成: 总计 %d 次替换\n", result.TotalReplacements)
+		fmt.Printf("  单元格: %d\n", result.CellsProcessed)
+		fmt.Printf("  工作表: %d\n", result.SheetsProcessed)
+	}
+
+	// 确定输出文件名
+	outputFile := cfg.OutputFile
+	if outputFile == "" {
+		ext := filepath.Ext(cfg.InputFile)
+		base := cfg.InputFile[:len(cfg.InputFile)-len(ext)]
+		outputFile = base + "_replaced" + ext
+	}
+
+	// 检查输出文件是否已存在
+	if _, err := os.Stat(outputFile); err == nil {
+		fmt.Printf("警告: 输出文件已存在: %s\n", outputFile)
+		fmt.Print("是否覆盖? (y/N): ")
+		var response string
+		_, _ = fmt.Scanln(&response)
+		if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
+			fmt.Println("操作已取消")
+			return
+		}
+	}
+
+	// 保存文档
+	outputDir := filepath.Dir(outputFile)
+	if outputDir != "." && outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			log.Fatalf("无法创建输出目录: %v", err)
+		}
+	}
+
+	if err := f.SaveAs(outputFile); err != nil {
+		log.Fatalf("保存电子表格失败: %v", err)
+	}
+
+	fmt.Printf("\n成功处理并保存电子表格！\n")
+	fmt.Printf("  提取单元格数: %d\n", len(allTexts))
+	fmt.Printf("  总共进行了 %d 次替换\n", result.TotalReplacements)
+	fmt.Printf("  处理了 %d 个单元格\n", result.CellsProcessed)
+	fmt.Printf("  涉及 %d 个工作表\n", result.SheetsProcessed)
+	fmt.Printf("  输出文件: %s\n", outputFile)
+}
+
+func toDocxRules(rules []ReplacementRule) []docxlib.ReplacementRule {
+	result := make([]docxlib.ReplacementRule, len(rules))
+	for i, r := range rules {
+		result[i] = docxlib.ReplacementRule{Old: r.Old, New: r.New}
+	}
+	return result
+}
+
+func toXlsxRules(rules []ReplacementRule) []xlsxlib.ReplacementRule {
+	result := make([]xlsxlib.ReplacementRule, len(rules))
+	for i, r := range rules {
+		result[i] = xlsxlib.ReplacementRule{Old: r.Old, New: r.New}
+	}
+	return result
+}
+
 // parseFlags 解析命令行参数
 func parseFlags() *Config {
 	cfg := &Config{Workers: 0} // 0 表示使用 runtime.NumCPU()
 
 	flagSet := flag.NewFlagSet("docx-find-replace", flag.ContinueOnError)
 
-	input := flagSet.String("i", "", "输入 DOCX 文件路径")
-	inputLong := flagSet.String("input", "", "输入 DOCX 文件路径")
-	output := flagSet.String("o", "", "输出文件路径 (DOCX 默认: <input>_replaced.docx, TS 默认: docx_template.ts)")
+	input := flagSet.String("i", "", "输入文件路径 (.docx 或 .xlsx)")
+	inputLong := flagSet.String("input", "", "输入文件路径 (.docx 或 .xlsx)")
+	output := flagSet.String("o", "", "输出文件路径")
 	outputLong := flagSet.String("output", "", "输出文件路径")
 	replace := flagSet.String("r", "", "替换文本 old=new (可多次使用)")
 	replaceLong := flagSet.String("replace", "", "替换文本 old=value (可多次使用)")
 	replaceFile := flagSet.String("f", "", "JSON 替换规则文件")
 	replaceFileLong := flagSet.String("replace-file", "", "JSON 替换规则文件")
-	noHeaders := flagSet.Bool("no-headers", false, "跳过页眉部分")
-	noFooters := flagSet.Bool("no-footers", false, "跳过页脚部分")
+	noHeaders := flagSet.Bool("no-headers", false, "跳过页眉部分 (仅 DOCX)")
+	noFooters := flagSet.Bool("no-footers", false, "跳过页脚部分 (仅 DOCX)")
 	verbose := flagSet.Bool("v", false, "显示详细处理信息")
 	version := flagSet.Bool("V", false, "显示版本号")
 	versionLong := flagSet.Bool("version", false, "显示版本号")
 	verboseLong := flagSet.Bool("verbose", false, "显示详细处理信息")
-	extract := flagSet.Bool("extract", false, "仅提取文档中的所有文本")
+	extract := flagSet.Bool("extract", false, "仅提取文件中的所有文本")
 	toTS := flagSet.Bool("to-ts", false, "将 DOCX 转换为 TypeScript 源码")
 	workers := flagSet.Int("workers", 0, "并发 worker 数量 (默认: CPU 核心数)")
 	help := flagSet.Bool("h", false, "显示帮助信息")
@@ -204,6 +346,7 @@ func parseFlags() *Config {
 
 	_ = flagSet.Parse(os.Args[1:])
 	flagSet.Usage = printHelp
+
 	// 输入/输出
 	if *input != "" {
 		cfg.InputFile = *input
@@ -270,23 +413,23 @@ func parseFlags() *Config {
 	return cfg
 }
 
-func parseReplacement(repStr string) *docxlib.ReplacementRule {
+func parseReplacement(repStr string) *ReplacementRule {
 	parts := strings.SplitN(repStr, "=", 2)
 	if len(parts) != 2 {
 		log.Printf("警告: 无效的替换格式 '%s'，忽略", repStr)
 		return nil
 	}
-	return &docxlib.ReplacementRule{Old: parts[0], New: parts[1]}
+	return &ReplacementRule{Old: parts[0], New: parts[1]}
 }
 
-func loadReplacementsFromFile(filename string) []docxlib.ReplacementRule {
+func loadReplacementsFromFile(filename string) []ReplacementRule {
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("无法打开替换文件: %v", err)
 	}
 	defer file.Close()
 
-	var replacements []docxlib.ReplacementRule
+	var replacements []ReplacementRule
 	if err := json.NewDecoder(file).Decode(&replacements); err != nil {
 		log.Fatalf("无法解析替换文件: %v", err)
 	}
@@ -294,30 +437,44 @@ func loadReplacementsFromFile(filename string) []docxlib.ReplacementRule {
 }
 
 func printHelp() {
-	helpText := `docx-find-replace (%s)- 在 DOCX 文件中查找和替换文本
+	helpText := `docx-find-replace (%s)- 在 DOCX/XLSX 文件中查找和替换文本
 
 用法:
   docx-find-replace -i <input> [选项]
 
+支持文件类型:
+  .docx  - Word 文档 (支持文本提取、替换、TypeScript 转换)
+  .xlsx  - Excel 电子表格 (支持文本提取、替换，保持原单元格样式)
+
 选项:
-  -i, --input <file>         输入 DOCX 文件路径
-  -o, --output <file>        输出文件路径 (DOCX 默认: <input>_replaced.docx, TS 默认: docx_template.ts)
+  -i, --input <file>         输入文件路径 (.docx 或 .xlsx)
+  -o, --output <file>        输出文件路径 (默认: <input>_replaced.<ext>)
   -r, --replace <old=new>    替换文本 (可多次使用)
   -f, --replace-file <file>  JSON 文件，包含替换规则
-      --extract              仅提取文档中的所有文本，不执行替换
-      --to-ts                将 DOCX 转换为 TypeScript 源码
-      --no-headers           跳过页眉部分
-      --no-footers           跳过页脚部分
+      --extract              仅提取文件中的所有文本，不执行替换
+      --to-ts                将 DOCX 转换为 TypeScript 源码 (仅 DOCX)
+      --no-headers           跳过页眉部分 (仅 DOCX)
+      --no-footers           跳过页脚部分 (仅 DOCX)
       --workers <n>          并发 worker 数量 (默认: CPU 核心数)
   -v, --verbose              显示详细处理信息
+  -V, --version              显示版本号
   -h, --help                 显示此帮助信息
 
 示例:
-  # 提取文档中所有文本
+  # 提取 DOCX 中所有文本
   docx-find-replace -i input.docx --extract
 
-  # 替换文本
+  # 替换 DOCX 中的文本
   docx-find-replace -i input.docx -r "Company A=Company B"
+
+  # 提取 XLSX 中所有文本
+  docx-find-replace -i input.xlsx --extract
+
+  # 替换 XLSX 中的文本 (保持原单元格样式)
+  docx-find-replace -i input.xlsx -r "Old Name=New Name"
+
+  # 使用 JSON 替换规则文件
+  docx-find-replace -i input.xlsx -f rules.json
 
   # 转换为 TypeScript
   docx-find-replace -i input.docx --to-ts -o output.ts

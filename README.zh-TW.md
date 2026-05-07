@@ -12,14 +12,14 @@
 
 ---
 
-`docx-cli` 是一個基於 Go 的命令列工具，用於對 DOCX 文件進行查找替換、文字提取以及轉換為 TypeScript 程式碼。
+`docx-cli` 是一個基於 Go 的命令列工具，用於對 DOCX 文件和 XLSX 電子表格進行查找替換、文字提取，以及將 DOCX 轉換為 TypeScript 程式碼。
 
 ### 功能特性
 
-- **全文查找替換**：支援正文段落、表格儲存格、頁首、頁尾中的文字替換
+- **全文查找替換**：支援正文段落、表格儲存格、頁首、頁尾中的文字替換（DOCX）；支援多工作表儲存格文字替換，保持原儲存格樣式、字體、寬高（XLSX）
 - **並發處理**：支援多 Worker 並發替換，提升處理速度
-- **文字提取**：提取 DOCX 中所有文字內容並顯示位置資訊
-- **樣式保留**：替換時保留原始文字樣式（字體、粗體、斜體、顏色、大小等）
+- **文字提取**：提取 DOCX/XLSX 中所有文字內容並顯示位置資訊
+- **樣式保留**：DOCX 替換時保留原始文字樣式（字體、粗體、斜體、顏色、大小等）；XLSX 替換時保留儲存格樣式（字體、對齊、邊框、填充、數字格式、欄寬、行高）
 - **TypeScript 轉換**：將 DOCX 文件轉換為 `docx.js` 可用的 TypeScript 原始碼
 - **圖片支援**：提取內嵌圖片並以 Base64 形式嵌入生成的 TypeScript
 
@@ -42,26 +42,38 @@ go build -o docx-find-replace.exe ./cmd
 #### 查找替換
 
 ```bash
-# 基本替換
+# DOCX 基本替換
 docx-find-replace -i input.docx -r "Company A=Company B"
 
-# 多條替換規則
+# DOCX 多條替換規則
 docx-find-replace -i input.docx -r "Hello=Hi" -r "World=Earth"
+
+# XLSX 基本替換（保持原儲存格樣式、字體、寬高）
+docx-find-replace -i input.xlsx -r "Company A=Company B"
+
+# XLSX 多條替換規則
+docx-find-replace -i input.xlsx -r "Hello=Hi" -r "World=Earth"
 
 # 使用 JSON 規則文件
 docx-find-replace -i input.docx -f replacements.json
+docx-find-replace -i input.xlsx -f replacements.json
 
-# 跳過頁首頁尾
+# 跳過頁首頁尾（僅 DOCX）
 docx-find-replace -i input.docx -r "old=new" --no-headers --no-footers
 
 # 指定並發 Worker 數
 docx-find-replace -i input.docx -r "old=new" --workers 8
+docx-find-replace -i input.xlsx -r "old=new" --workers 8
 ```
 
 #### 提取文字
 
 ```bash
+# DOCX
 docx-find-replace -i input.docx --extract
+
+# XLSX
+docx-find-replace -i input.xlsx --extract
 ```
 
 #### 轉換為 TypeScript
@@ -89,12 +101,17 @@ docx-cli/
 ├── cmd/              # CLI 入口
 │   ├── main.go
 │   └── main_test.go
-├── pkg/docxlib/      # 核心庫
+├── pkg/docxlib/      # DOCX 核心庫
 │   ├── types.go      # 公共類型
 │   ├── extract.go    # 文字提取
 │   ├── replace.go    # 替換邏輯
 │   ├── to_ts.go      # TypeScript 轉換
 │   └── unsafe.go     # unsafe 反射輔助
+├── pkg/xlsxlib/      # XLSX 核心庫
+│   ├── types.go      # 公共類型
+│   ├── extract.go    # 文字提取
+│   ├── replace.go    # 替換邏輯
+│   └── xlsxlib_test.go
 ├── assets/           # 靜態資源
 │   └── logo.svg
 ├── tests/            # 測試文件
@@ -117,6 +134,7 @@ go test ./...
 本專案使用了以下開源專案：
 
 - [gomutex/godocx](https://github.com/gomutex/godocx) — Go DOCX 解析庫，[MIT License](https://opensource.org/licenses/MIT)
+- [xuri/excelize](https://github.com/xuri/excelize) — Go XLSX 解析庫，[BSD-3 License](https://opensource.org/licenses/BSD-3-Clause)
 - [docx](https://github.com/dolanmiu/docx) (docx.js) — TypeScript DOCX 生成庫，[MIT License](https://opensource.org/licenses/MIT)
 
 ### 開源協議
