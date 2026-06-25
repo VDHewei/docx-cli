@@ -3,3 +3,4 @@
 *.exe
 *.out
 test/data/
+test/output/
