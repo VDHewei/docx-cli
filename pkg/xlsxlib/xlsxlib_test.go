@@ -692,3 +692,42 @@ func TestReplaceAllByBytes_PreservesStyle(t *testing.T) {
 		t.Errorf("字体大小未保留: 期望 14，实际 %f", styleDetail.Font.Size)
 	}
 }
+
+func TestReplaceAllBytesPreservePackage_WithSkipSheets(t *testing.T) {
+	f := excelize.NewFile()
+	f.SetCellValue("Sheet1", "A1", "Hello Shared")
+	f.NewSheet("Sheet2")
+	f.SetCellValue("Sheet2", "A1", "Hello Shared")
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		t.Fatalf("写入缓冲区失败: %v", err)
+	}
+	f.Close()
+
+	output, result, err := ReplaceAllBytesPreservePackage(buf.Bytes(), []ReplacementRule{{Old: "Hello", New: "Hi"}}, ReplaceOptions{
+		Workers:    1,
+		SkipSheets: []string{"Sheet2"},
+	})
+	if err != nil {
+		t.Fatalf("ReplaceAllBytesPreservePackage 失败: %v", err)
+	}
+	if result.TotalReplacements != 1 {
+		t.Fatalf("期望替换 1 次，实际 %d", result.TotalReplacements)
+	}
+
+	xlsx, err := excelize.OpenReader(bytes.NewReader(output))
+	if err != nil {
+		t.Fatalf("打开保真替换结果失败: %v", err)
+	}
+	defer xlsx.Close()
+
+	val1, _ := xlsx.GetCellValue("Sheet1", "A1")
+	val2, _ := xlsx.GetCellValue("Sheet2", "A1")
+	if val1 != "Hi Shared" {
+		t.Errorf("Sheet1 A1 期望 'Hi Shared'，实际 '%s'", val1)
+	}
+	if val2 != "Hello Shared" {
+		t.Errorf("Sheet2 A1 应未被修改，实际 '%s'", val2)
+	}
+}

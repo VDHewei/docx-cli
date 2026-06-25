@@ -3,6 +3,8 @@ package docxlib
 import (
 	"archive/zip"
 	"bytes"
+	"compress/flate"
+	"hash/crc32"
 	"io"
 	"strings"
 )
@@ -91,18 +93,17 @@ func rewriteZipPackage(files []*zip.File, modifiedFiles map[string][]byte) ([]by
 			continue
 		}
 
-		header := file.FileHeader
-		header.CRC32 = 0
-		header.CompressedSize = 0
-		header.UncompressedSize = 0
-		header.CompressedSize64 = 0
-		header.UncompressedSize64 = 0
-		entryWriter, err := writer.CreateHeader(&header)
+		header, rawContent, err := rawZipHeaderAndContent(file, modified)
 		if err != nil {
 			_ = writer.Close()
 			return nil, err
 		}
-		if _, err := entryWriter.Write(modified); err != nil {
+		entryWriter, err := writer.CreateRaw(header)
+		if err != nil {
+			_ = writer.Close()
+			return nil, err
+		}
+		if _, err := entryWriter.Write(rawContent); err != nil {
 			_ = writer.Close()
 			return nil, err
 		}
@@ -111,4 +112,32 @@ func rewriteZipPackage(files []*zip.File, modifiedFiles map[string][]byte) ([]by
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func rawZipHeaderAndContent(file *zip.File, content []byte) (*zip.FileHeader, []byte, error) {
+	header := file.FileHeader
+	rawContent := content
+	if header.Method == zip.Deflate {
+		var compressed bytes.Buffer
+		deflater, err := flate.NewWriter(&compressed, flate.BestCompression)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, err := deflater.Write(content); err != nil {
+			_ = deflater.Close()
+			return nil, nil, err
+		}
+		if err := deflater.Close(); err != nil {
+			return nil, nil, err
+		}
+		rawContent = compressed.Bytes()
+	}
+
+	header.Flags &^= 0x8
+	header.CRC32 = crc32.ChecksumIEEE(content)
+	header.CompressedSize = uint32(len(rawContent))
+	header.UncompressedSize = uint32(len(content))
+	header.CompressedSize64 = uint64(len(rawContent))
+	header.UncompressedSize64 = uint64(len(content))
+	return &header, rawContent, nil
 }

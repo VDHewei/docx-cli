@@ -162,11 +162,18 @@ func processDocx(cfg *Config) {
 
 	docxRules := toDocxRules(cfg.Replacements)
 	allTexts := docxlib.ExtractAllText(rootDoc)
-	result := docxlib.ReplaceAll(rootDoc, docxRules, docxlib.ReplaceOptions{
+	inputData, err := os.ReadFile(cfg.InputFile)
+	if err != nil {
+		log.Fatal(i18n.T(i18n.ErrOpenDocument, map[string]interface{}{"Error": err.Error()}))
+	}
+	outputData, result, err := docxlib.ReplaceAllBytesPreservePackage(inputData, docxRules, docxlib.ReplaceOptions{
 		SkipHeaders: cfg.NoHeaders,
 		SkipFooters: cfg.NoFooters,
 		Workers:     cfg.Workers,
 	})
+	if err != nil {
+		log.Fatal(i18n.T(i18n.ErrSaveDocument, map[string]interface{}{"Error": err.Error()}))
+	}
 
 	if cfg.Verbose {
 		fmt.Println(i18n.T(i18n.VerboseReplaceDone, map[string]interface{}{"Count": result.TotalReplacements}))
@@ -184,7 +191,7 @@ func processDocx(cfg *Config) {
 
 	ensureOutputDir(outputFile)
 
-	if err := rootDoc.SaveTo(outputFile); err != nil {
+	if err := os.WriteFile(outputFile, outputData, 0644); err != nil {
 		log.Fatal(i18n.T(i18n.ErrSaveDocument, map[string]interface{}{"Error": err.Error()}))
 	}
 
@@ -245,10 +252,17 @@ func processXlsx(cfg *Config) {
 
 	xlsxRules := toXlsxRules(cfg.Replacements)
 	allTexts := xlsxlib.ExtractAllText(f)
-	result := xlsxlib.ReplaceAll(f, xlsxRules, xlsxlib.ReplaceOptions{
+	inputData, err := os.ReadFile(cfg.InputFile)
+	if err != nil {
+		log.Fatal(i18n.T(i18n.ErrOpenSpreadsheet, map[string]interface{}{"Error": err.Error()}))
+	}
+	outputData, result, err := xlsxlib.ReplaceAllBytesPreservePackage(inputData, xlsxRules, xlsxlib.ReplaceOptions{
 		Workers:    cfg.Workers,
 		SkipSheets: cfg.SkipSheets,
 	})
+	if err != nil {
+		log.Fatal(i18n.T(i18n.ErrSaveSpreadsheet, map[string]interface{}{"Error": err.Error()}))
+	}
 
 	if cfg.Verbose {
 		fmt.Println(i18n.T(i18n.VerboseReplaceDone, map[string]interface{}{"Count": result.TotalReplacements}))
@@ -264,7 +278,7 @@ func processXlsx(cfg *Config) {
 
 	ensureOutputDir(outputFile)
 
-	if err := f.SaveAs(outputFile); err != nil {
+	if err := os.WriteFile(outputFile, outputData, 0644); err != nil {
 		log.Fatal(i18n.T(i18n.ErrSaveSpreadsheet, map[string]interface{}{"Error": err.Error()}))
 	}
 

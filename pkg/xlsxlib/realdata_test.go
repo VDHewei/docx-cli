@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -320,7 +321,7 @@ func saveXlsxForTest(t *testing.T, xlsx *excelize.File, label string) string {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		t.Fatalf("创建 XLSX 输出目录失败: %v", err)
 	}
-	path := filepath.Join(outputDir, "xlsxlib-"+sanitizeOutputName(t.Name())+"-"+label+".xlsx")
+	path := filepath.Join(outputDir, "xlsxlib-"+sanitizeOutputName(t.Name())+"-"+label+"-"+fmt.Sprint(time.Now().UnixNano())+".xlsx")
 	if err := xlsx.SaveAs(path); err != nil {
 		t.Fatalf("保存 XLSX 失败: %v", err)
 	}
@@ -333,7 +334,7 @@ func saveBytesForTest(t *testing.T, data []byte, prefix, label, ext string) stri
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		t.Fatalf("创建输出目录失败: %v", err)
 	}
-	path := filepath.Join(outputDir, prefix+"-"+sanitizeOutputName(t.Name())+"-"+label+ext)
+	path := filepath.Join(outputDir, prefix+"-"+sanitizeOutputName(t.Name())+"-"+label+"-"+fmt.Sprint(time.Now().UnixNano())+ext)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatalf("保存输出文件失败: %v", err)
 	}

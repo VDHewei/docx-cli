@@ -13,7 +13,7 @@ import (
 	"github.com/gomutex/godocx/wml/ctypes"
 )
 
-var wordTextElementRE = regexp.MustCompile(`(?s)(<((?:[A-Za-z0-9_]+:)?t)\b[^>]*>)(.*?)(</(?:[A-Za-z0-9_]+:)?t>)`)
+var wordTextElementRE = regexp.MustCompile(`(?s)(<((?:(?:w|a):)?t)\b[^>]*>)(.*?)(</(?:(?:w|a):)?t>)`)
 
 // ReplaceOptions controls replacement behavior.
 type ReplaceOptions struct {
