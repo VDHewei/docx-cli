@@ -1,6 +1,9 @@
 package docxlib
 
 import (
+	"bytes"
+	"encoding/xml"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -9,6 +12,8 @@ import (
 	"github.com/gomutex/godocx/packager"
 	"github.com/gomutex/godocx/wml/ctypes"
 )
+
+var wordTextElementRE = regexp.MustCompile(`(?s)(<((?:[A-Za-z0-9_]+:)?t)\b[^>]*>)(.*?)(</(?:[A-Za-z0-9_]+:)?t>)`)
 
 // ReplaceOptions controls replacement behavior.
 type ReplaceOptions struct {
@@ -170,53 +175,31 @@ func (u *replaceUnit) applyParagraph(rules []ReplacementRule) int {
 		return 0
 	}
 
-	// Extract the full concatenated text of the paragraph.
-	var text strings.Builder
-	for _, child := range u.para.Children {
-		if child.Run == nil {
+	var textRefs []*ctypes.Text
+	var chunks []string
+	for childIdx := range u.para.Children {
+		run := u.para.Children[childIdx].Run
+		if run == nil {
 			continue
 		}
-		for _, runChild := range child.Run.Children {
+		for runChildIdx := range run.Children {
+			runChild := &run.Children[runChildIdx]
 			if runChild.Text != nil {
-				text.WriteString(runChild.Text.Text)
+				textRefs = append(textRefs, runChild.Text)
+				chunks = append(chunks, runChild.Text.Text)
 			}
 		}
 	}
 
-	original := text.String()
+	original := strings.Join(chunks, "")
 	if original == "" {
 		return 0
 	}
 
-	modified := original
-	count := 0
-	for _, rule := range rules {
-		if strings.Contains(modified, rule.Old) {
-			n := strings.Count(modified, rule.Old)
-			modified = strings.ReplaceAll(modified, rule.Old, rule.New)
-			count += n
-		}
-	}
-
-	if modified != original {
-		// Preserve the first run's Property (font, bold, italic, size, color, etc.)
-		// and replace its text content, removing all other runs to avoid duplication.
-		var preservedProp *ctypes.RunProperty
-		for _, child := range u.para.Children {
-			if child.Run != nil {
-				preservedProp = child.Run.Property
-				break
-			}
-		}
-
-		newRun := &ctypes.Run{
-			Property: preservedProp,
-			Children: []ctypes.RunChild{
-				{Text: ctypes.TextFromString(modified)},
-			},
-		}
-		u.para.Children = []ctypes.ParagraphChild{
-			{Run: newRun},
+	replacedChunks, count, changed := replaceTextChunks(chunks, rules)
+	if changed {
+		for i, textRef := range textRefs {
+			textRef.Text = replacedChunks[i]
 		}
 	}
 
@@ -234,20 +217,99 @@ func (u *replaceUnit) applyXML(rules []ReplacementRule) int {
 		return 0
 	}
 
-	content := string(val.([]byte))
-	original := content
-	count := 0
-	for _, rule := range rules {
-		if strings.Contains(content, rule.Old) {
-			n := strings.Count(content, rule.Old)
-			content = strings.ReplaceAll(content, rule.Old, rule.New)
-			count += n
-		}
-	}
-
-	if content != original {
-		u.rootDoc.FileMap.Store(u.path, []byte(content))
+	content := val.([]byte)
+	modified, count := replaceXMLTextContent(content, rules)
+	if count > 0 {
+		u.rootDoc.FileMap.Store(u.path, modified)
 	}
 
 	return count
+}
+
+func applyReplacementRules(text string, rules []ReplacementRule) (string, int) {
+	modified := text
+	count := 0
+	for _, rule := range rules {
+		if rule.Old == "" {
+			continue
+		}
+		if strings.Contains(modified, rule.Old) {
+			n := strings.Count(modified, rule.Old)
+			modified = strings.ReplaceAll(modified, rule.Old, rule.New)
+			count += n
+		}
+	}
+	return modified, count
+}
+
+func replaceTextChunks(chunks []string, rules []ReplacementRule) ([]string, int, bool) {
+	original := strings.Join(chunks, "")
+	modified, count := applyReplacementRules(original, rules)
+	if modified == original || count == 0 {
+		return chunks, count, false
+	}
+
+	return distributeText(chunks, modified), count, true
+}
+
+func distributeText(originalChunks []string, text string) []string {
+	result := make([]string, len(originalChunks))
+	remaining := []rune(text)
+	for i, chunk := range originalChunks {
+		if i == len(originalChunks)-1 {
+			result[i] = string(remaining)
+			break
+		}
+		width := len([]rune(chunk))
+		if width >= len(remaining) {
+			result[i] = string(remaining)
+			remaining = nil
+			continue
+		}
+		result[i] = string(remaining[:width])
+		remaining = remaining[width:]
+	}
+	return result
+}
+
+func replaceXMLTextContent(content []byte, rules []ReplacementRule) ([]byte, int) {
+	total := 0
+	modified := wordTextElementRE.ReplaceAllFunc(content, func(match []byte) []byte {
+		parts := wordTextElementRE.FindSubmatch(match)
+		if len(parts) != 5 {
+			return match
+		}
+
+		text, err := xmlUnescapeString(string(parts[3]))
+		if err != nil {
+			return match
+		}
+
+		replaced, count := applyReplacementRules(text, rules)
+		if count == 0 {
+			return match
+		}
+		total += count
+
+		var escaped bytes.Buffer
+		if err := xml.EscapeText(&escaped, []byte(replaced)); err != nil {
+			return match
+		}
+
+		out := make([]byte, 0, len(parts[1])+escaped.Len()+len(parts[4]))
+		out = append(out, parts[1]...)
+		out = append(out, escaped.Bytes()...)
+		out = append(out, parts[4]...)
+		return out
+	})
+
+	return modified, total
+}
+
+func xmlUnescapeString(s string) (string, error) {
+	var value string
+	if err := xml.Unmarshal([]byte("<x>"+s+"</x>"), &value); err != nil {
+		return "", err
+	}
+	return value, nil
 }

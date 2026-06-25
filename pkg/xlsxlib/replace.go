@@ -114,6 +114,9 @@ func ReplaceAll(f *excelize.File, rules []ReplacementRule, opts ReplaceOptions) 
 				// Check if any rule matches this cell
 				matched := false
 				for _, rule := range rules {
+					if rule.Old == "" {
+						continue
+					}
 					if strings.Contains(cellValue, rule.Old) {
 						matched = true
 						break
@@ -167,6 +170,11 @@ func ReplaceAll(f *excelize.File, rules []ReplacementRule, opts ReplaceOptions) 
 
 // replaceCell replaces text in a single cell, preserving its style.
 func replaceCell(f *excelize.File, sheet, cell string, rules []ReplacementRule) int {
+	formula, err := f.GetCellFormula(sheet, cell)
+	if err == nil && formula != "" {
+		return 0
+	}
+
 	cellValue, err := f.GetCellValue(sheet, cell)
 	if err != nil || cellValue == "" {
 		return 0
@@ -177,6 +185,9 @@ func replaceCell(f *excelize.File, sheet, cell string, rules []ReplacementRule) 
 	count := 0
 
 	for _, rule := range rules {
+		if rule.Old == "" {
+			continue
+		}
 		if strings.Contains(modified, rule.Old) {
 			n := strings.Count(modified, rule.Old)
 			modified = strings.ReplaceAll(modified, rule.Old, rule.New)

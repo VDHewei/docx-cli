@@ -207,7 +207,7 @@ func TestReplaceAll_PreservesStyle(t *testing.T) {
 }
 
 func TestIntegration_ExtractTemplateRISC(t *testing.T) {
-	templatePath := filepath.Join("..", "..", "tests", "template_RISC.docx")
+	templatePath := filepath.Join("..", "..", "test", "data", "template_RISC.docx")
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		t.Skip("跳过集成测试: 未找到 template_RISC.docx")
 	}
@@ -232,7 +232,7 @@ func TestIntegration_ExtractTemplateRISC(t *testing.T) {
 }
 
 func TestIntegration_ReplaceTemplateRISC(t *testing.T) {
-	templatePath := filepath.Join("..", "..", "tests", "template_RISC.docx")
+	templatePath := filepath.Join("..", "..", "test", "data", "template_RISC.docx")
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		t.Skip("跳过集成测试: 未找到 template_RISC.docx")
 	}
