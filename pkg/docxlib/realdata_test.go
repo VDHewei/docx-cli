@@ -18,85 +18,115 @@ import (
 )
 
 func TestReplaceAllByBytes_RealDocx_NoMatchKeepsContentAndStructure(t *testing.T) {
-	data := readDocxFixtureBytes(t, "test.docx")
-	beforeDoc, beforeResult, err := ReplaceAllByBytes(data, nil, ReplaceOptions{Workers: 2})
-	if err != nil {
-		t.Fatalf("创建 ReplaceAllByBytes 基线失败: %v", err)
-	}
-	if beforeResult.TotalReplacements != 0 {
-		t.Fatalf("无规则基线不应发生替换，实际 %d", beforeResult.TotalReplacements)
-	}
-	beforeTexts := docxTextList(beforeDoc)
+	for _, fixtureName := range docxFixtureNames(t) {
+		t.Run(fixtureName, func(t *testing.T) {
+			data := readDocxFixtureBytes(t, fixtureName)
+			beforeDoc, beforeResult, err := ReplaceAllByBytes(data, nil, ReplaceOptions{Workers: 2})
+			if err != nil {
+				t.Fatalf("创建 ReplaceAllByBytes 基线失败: %v", err)
+			}
+			if beforeResult.TotalReplacements != 0 {
+				t.Fatalf("无规则基线不应发生替换，实际 %d", beforeResult.TotalReplacements)
+			}
+			beforeTexts := docxTextList(beforeDoc)
 
-	doc, result, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: "__DOCX_CLI_NO_SUCH_TEXT__", New: "unused"}}, ReplaceOptions{Workers: 2})
-	if err != nil {
-		t.Fatalf("ReplaceAllByBytes 失败: %v", err)
-	}
-	if result.TotalReplacements != 0 {
-		t.Fatalf("无匹配内容时不应发生替换，实际 %d", result.TotalReplacements)
-	}
-	if afterTexts := docxTextList(doc); !reflect.DeepEqual(afterTexts, beforeTexts) {
-		t.Fatalf("无匹配内容时文本不应变化")
-	}
+			doc, result, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: "__DOCX_CLI_NO_SUCH_TEXT__", New: "unused"}}, ReplaceOptions{Workers: 2})
+			if err != nil {
+				t.Fatalf("ReplaceAllByBytes 失败: %v", err)
+			}
+			if result.TotalReplacements != 0 {
+				t.Fatalf("无匹配内容时不应发生替换，实际 %d", result.TotalReplacements)
+			}
+			if afterTexts := docxTextList(doc); !reflect.DeepEqual(afterTexts, beforeTexts) {
+				t.Fatalf("无匹配内容时文本不应变化")
+			}
 
-	beforePath := saveDocxForTest(t, beforeDoc)
-	afterPath := saveDocxForTest(t, doc)
-	assertDocxStructureEqual(t, beforePath, afterPath)
+			beforePath := saveDocxForTest(t, beforeDoc)
+			afterPath := saveDocxForTest(t, doc)
+			assertDocxStructureEqual(t, beforePath, afterPath)
+		})
+	}
 }
 
 func TestReplaceAll_RealDocx_ReplacesTextOnlyAndPreservesStructure(t *testing.T) {
-	doc := openDocxFixture(t, "test.docx")
-	oldText := pickDocxReplacementText(t, doc)
-	newText := "DOCX CLI REAL DATA REPLACEMENT"
+	for _, fixtureName := range docxFixtureNames(t) {
+		t.Run(fixtureName, func(t *testing.T) {
+			doc := openDocxFixture(t, fixtureName)
+			oldText := pickDocxReplacementText(t, doc)
+			newText := "DOCX CLI REAL DATA REPLACEMENT"
 
-	beforePath := saveDocxForTest(t, openDocxFixture(t, "test.docx"))
-	result := ReplaceAll(doc, []ReplacementRule{{Old: oldText, New: newText}}, ReplaceOptions{Workers: 2})
-	if result.TotalReplacements == 0 {
-		t.Fatalf("期望真实文档至少发生 1 次替换")
-	}
+			beforeText := strings.Join(docxTextList(doc), "")
+			beforePath := saveDocxForTest(t, openDocxFixture(t, fixtureName))
+			result := ReplaceAll(doc, []ReplacementRule{{Old: oldText, New: newText}}, ReplaceOptions{Workers: 2})
+			if result.TotalReplacements == 0 {
+				t.Fatalf("期望真实文档至少发生 1 次替换")
+			}
 
-	afterText := strings.Join(docxTextList(doc), "")
-	if strings.Contains(afterText, oldText) {
-		t.Fatalf("替换后不应再包含旧文本 %q", oldText)
-	}
-	if !strings.Contains(afterText, newText) {
-		t.Fatalf("替换后未找到新文本 %q", newText)
-	}
+			afterText := strings.Join(docxTextList(doc), "")
+			if strings.Count(afterText, oldText) >= strings.Count(beforeText, oldText) {
+				t.Fatalf("替换后旧文本数量未减少: %q", oldText)
+			}
+			if !strings.Contains(afterText, newText) {
+				t.Fatalf("替换后未找到新文本 %q", newText)
+			}
 
-	afterPath := saveDocxForTest(t, doc)
-	assertDocxStructureEqual(t, beforePath, afterPath)
-	assertDocxEntriesEqual(t, beforePath, afterPath, func(name string) bool {
-		return (strings.HasPrefix(name, "word/header") || strings.HasPrefix(name, "word/footer")) && strings.HasSuffix(name, ".xml")
-	})
+			afterPath := saveDocxForTest(t, doc)
+			assertDocxStructureEqual(t, beforePath, afterPath)
+			assertDocxEntriesEqual(t, beforePath, afterPath, func(name string) bool {
+				return (strings.HasPrefix(name, "word/header") || strings.HasPrefix(name, "word/footer")) && strings.HasSuffix(name, ".xml")
+			})
+		})
+	}
 }
 
 func TestReplaceAllByBytes_RealDocx_SavedSizeTracksLongerAndShorterContent(t *testing.T) {
-	data := readDocxFixtureBytes(t, "test.docx")
-	oldText := pickDocxReplacementText(t, openDocxFixture(t, "test.docx"))
+	for _, fixtureName := range docxFixtureNames(t) {
+		t.Run(fixtureName, func(t *testing.T) {
+			data := readDocxFixtureBytes(t, fixtureName)
+			oldText := pickDocxReplacementText(t, openDocxFixture(t, fixtureName))
 
-	longDoc, longResult, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: oldText, New: longDocxReplacement()}}, ReplaceOptions{Workers: 2})
-	if err != nil {
-		t.Fatalf("长文本 ReplaceAllByBytes 失败: %v", err)
-	}
-	if longResult.TotalReplacements == 0 {
-		t.Fatalf("长文本替换应至少发生 1 次")
-	}
-	longPath := saveDocxForTest(t, longDoc)
-	if got, wantMin := docxFileSize(t, longPath), int64(len(data)); got < wantMin {
-		t.Fatalf("替换后总体字符内容更长时，新文档大小应不小于旧文档: got %d, want >= %d", got, wantMin)
-	}
+			longDoc, longResult, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: oldText, New: longDocxReplacement()}}, ReplaceOptions{Workers: 2})
+			if err != nil {
+				t.Fatalf("长文本 ReplaceAllByBytes 失败: %v", err)
+			}
+			if longResult.TotalReplacements == 0 {
+				t.Fatalf("长文本替换应至少发生 1 次")
+			}
+			longPath := saveDocxForTest(t, longDoc)
+			if got, wantMin := docxFileSize(t, longPath), int64(len(data)); got < wantMin {
+				t.Fatalf("替换后总体字符内容更长时，新文档大小应不小于旧文档: got %d, want >= %d", got, wantMin)
+			}
 
-	shortDoc, shortResult, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: oldText, New: ""}}, ReplaceOptions{Workers: 2})
+			shortDoc, shortResult, err := ReplaceAllByBytes(data, []ReplacementRule{{Old: oldText, New: ""}}, ReplaceOptions{Workers: 2})
+			if err != nil {
+				t.Fatalf("短文本 ReplaceAllByBytes 失败: %v", err)
+			}
+			if shortResult.TotalReplacements == 0 {
+				t.Fatalf("短文本替换应至少发生 1 次")
+			}
+			shortPath := saveDocxForTest(t, shortDoc)
+			if got, wantMax := docxFileSize(t, shortPath), int64(len(data)); got >= wantMax {
+				t.Fatalf("替换后总体字符内容更短时，新文档大小应小于旧文档: got %d, want < %d", got, wantMax)
+			}
+		})
+	}
+}
+
+func docxFixtureNames(t *testing.T) []string {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join("..", "..", "test", "data", "*.docx"))
 	if err != nil {
-		t.Fatalf("短文本 ReplaceAllByBytes 失败: %v", err)
+		t.Fatalf("查找真实 DOCX fixture 失败: %v", err)
 	}
-	if shortResult.TotalReplacements == 0 {
-		t.Fatalf("短文本替换应至少发生 1 次")
+	if len(matches) == 0 {
+		t.Fatalf("test/data 下未找到 DOCX fixture")
 	}
-	shortPath := saveDocxForTest(t, shortDoc)
-	if got, wantMax := docxFileSize(t, shortPath), int64(len(data)); got >= wantMax {
-		t.Fatalf("替换后总体字符内容更短时，新文档大小应小于旧文档: got %d, want < %d", got, wantMax)
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		names = append(names, filepath.Base(match))
 	}
+	sort.Strings(names)
+	return names
 }
 
 func readDocxFixtureBytes(t *testing.T, name string) []byte {
@@ -161,7 +191,7 @@ func pickDocxReplacementText(t *testing.T, doc *docx.RootDoc) string {
 func longDocxReplacement() string {
 	var b strings.Builder
 	b.WriteString("DOCX_CLI_LONG_REPLACEMENT_")
-	for i := 0; i < 2500; i++ {
+	for i := 0; i < 12000; i++ {
 		fmt.Fprintf(&b, "%04d_%08x;", i, uint32(i*2654435761))
 	}
 	return b.String()
